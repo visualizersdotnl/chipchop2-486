@@ -1,0 +1,19 @@
+
+# Build output.
+*.obj
+*.exe
+*.err
+*.map
+
+# Intermediate data.
+data.cpp
+data.h
+gfx/*.h
+CC2_TMP
+
+# Not sure about this one since you have to build it manually.
+tracks.dat
+
+# Test build.
+test.rar
+test/*
