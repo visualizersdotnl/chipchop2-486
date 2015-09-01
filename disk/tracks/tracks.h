@@ -1,7 +1,5 @@
 
 /*
-	This header is used by the disk & builder (BUILD.CPP).
-
 	List of all included tracks and their actual filenames.
 	As we're dealing with FAT 8+3 I had to rename most modules.
 	

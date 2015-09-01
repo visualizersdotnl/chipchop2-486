@@ -1,6 +1,6 @@
 
 /*
-	Chip Chop #16 .
+	Chip Chop #16
 	The MS-DOS 486DX port by Space Operator / Megahawks INC.
 	Original Amiga 500 version by Tim/TBL.
 
@@ -9,7 +9,6 @@
 	General notes:
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
 	- Code style is a blend of 1990s and semi-modern: yes classes, no ASSERT.
-	- This is one monstrous file, and yes, I should have split it up.
 	- Compiler is babied a little for optimal code generation.
 
 	To do:

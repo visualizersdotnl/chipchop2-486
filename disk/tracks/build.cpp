@@ -17,7 +17,7 @@
 // MiniLZO.
 #include "../minilzo/minilzo.h"
 
-// MiniLZO work memory (ugly, taken straight from example).
+// MiniLZO work memory (ugly macro lifted from example).
 #define HEAP_ALLOC(varName, numBytes) lzo_align_t __LZO_MMODEL varName [ ((numBytes) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
 static HEAP_ALLOC(lzoWorkMem, LZO1X_1_MEM_COMPRESS);
 
