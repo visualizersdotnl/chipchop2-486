@@ -88,8 +88,8 @@ int main(int argC, char **argV)
 			const size_t iList = iTrack*3;
 			
 			const char *path   = s_tracks[iList+0];
-			const char *artist = s_tracks[iList+1];
-			const char *name   = s_tracks[iList+2];
+			const char *artist = s_tracks[iList+2];
+			const char *name   = s_tracks[iList+1];
 
 			printf("%s (%u): '%s' by %s\n", path, iTrack, name, artist);
 
