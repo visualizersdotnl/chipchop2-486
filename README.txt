@@ -1,16 +1,11 @@
 
-** First time? **
-
-This project is built in (MS-)DOS.
-
-1. Have at least 8MB of RAM at your disposal to build (4MB to run). No problem of course if you're using DOSBox or a VM.
-2. Before building and running the disk itself, go to /src/tracks and type 'wmake' then 'build' to build track archive.
-3. Now back to /src, then type 'wmake'.
-
-... Now read on :)
-
-PC MS-DOS (target: ~486DX2-66) port of Chip Chop #16 by Desire (Amiga music disk).
+PC MS-DOS (486DX2-66) port of Chip Chop #16 by Desire (Amiga music disk).
 All tools & libraries included!
+
+This project is built in MS-DOS.
+
+Have at least 8MB of RAM at your disposal to build (4MB to run). 
+No problem of course if you're using DOSBox or any VM.
 
 DOSBox instructions for Windows:
 - Install 0.74 or later.
@@ -22,16 +17,14 @@ DOSBox instructions for OSX:
 - Modify mount path at bottom of dosbox-0.74-osx.conf
 - Launch with .conf file: open -a DOSBox --args -conf ~/<path>/dosbox-0.74-osx.conf
 
-To build (mdisk.exe), simply type:
+** First time? **
+Head over to /disk/tracks and type 'wmake' then 'build' to build the track archive.
+
+To build the disk (mdisk.exe), simply type:
 - Release: 'wmake'
-- Debug: 'wmake debug=1'
-- Clean: 'wmake clean'
-- Pack: 'wmake pack' (renames mdisk.exe to cchop2.exe!)
-
-
-
-Some files are UPPER CASE, this is because they were created in DOS.
-Looks a bit messy, yes.
+-   Debug: 'wmake debug=1'
+-   Clean: 'wmake clean'
+-    Pack: 'wmake pack' (renames mdisk.exe to cchop2.exe)
 
 Credits:
 - Amiga code: Tim
