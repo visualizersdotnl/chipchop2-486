@@ -137,12 +137,6 @@ static char s_lastErr[256] = { 0 };
 //
 // --------------------------------------------------------------------------------------------------------------------
 
-// Declare intrinsics as not modifying any memory or registers (Watcom-specific).
-#pragma aux outpw modify nomemory exact []
-#pragma aux inppw modify nomemory exact []
-#pragma aux outp  modify nomemory exact []
-#pragma aux inpp  modify nomemory exact []
-
 // Byte port I/O aliases.
 #define outpb outp
 #define inpb  inp
@@ -295,7 +289,6 @@ __inline const char *StripPath(const char *path)
 #define VP_STATUS_ADDR  0x3da
 #define VP_FEATURE_ADDR 0x3da
 
-// Should be volatile, but let's agree not to read from VRAM shall we?
 uint8_t *s_pVRAM = (uint8_t *) 0xa0000;
 
 __inline void VGA_WaitForVBLANK()

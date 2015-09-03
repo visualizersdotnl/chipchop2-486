@@ -4,20 +4,18 @@
 	- Layout: a table with offset & size (both uint32_t) pairs followed by compressed data.
 	- Largest uncompressed track size is shown on exit; use it to allocate the MiniLZO uncompress buffer.
 
-	Problem: leaks if it quits halfway.
+	FIXME: leaks if it quits halfway.
 */
 
-// CRT:
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-// MiniLZO.
 #include "../minilzo/minilzo.h"
 
-// MiniLZO work memory (ugly macro lifted from example).
+// Compressor work memory (ugly macro lifted from example).
 #define HEAP_ALLOC(varName, numBytes) lzo_align_t __LZO_MMODEL varName [ ((numBytes) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
 static HEAP_ALLOC(lzoWorkMem, LZO1X_1_MEM_COMPRESS);
 

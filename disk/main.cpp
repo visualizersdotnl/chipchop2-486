@@ -4,7 +4,7 @@
 	The MS-DOS 486DX port by Space Operator / Megahawks INC.
 	Original Amiga 500 version by Tim/TBL.
 
-	Oldschool C-style rewrite (see OLD.CPP for previous ambitious C++ misfire).
+	Oldschool C-style rewrite.
 
 	General notes:
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
@@ -16,20 +16,16 @@
 	- AHX code: https://github.com/pete-gordon/hivelytracker/tree/master/Replayer_Windows
 */
 
-// CRT:
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <math.h>
-#include <conio.h>
+// #include <math.h>
+// #include <conio.h>
 
-// Libs:
 #include "midas/include/midasdll.h"
 #include "minilzo/minilzo.h"
-
-// Tracklist.
 #include "tracks\tracks.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -44,7 +40,96 @@ static char s_lastErr[256] = { 0 };
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Audio (using MIDAS sound system).
+// Misc. low-level stuff.
+//
+// --------------------------------------------------------------------------------------------------------------------
+
+unsigned inp(unsigned port);
+#pragma aux inp = "xor eax, eax", "in al,dx" parm [edx] value [eax] modify nomemory exact [eax];
+
+void outp(unsigned port, unsigned value);
+#pragma aux outp = "out dx,al" parm [edx] [eax] modify nomemory exact [];
+
+void outpw(unsigned port, unsigned value);
+#pragma aux outpw = "out dx,ax" parm [edx] [eax] modify nomemory exact [];
+
+void _disable();
+#pragma aux _disable = "cli" modify nomemory exact [];
+
+void _enable();
+#pragma aux _enable = "sti" modify nomemory exact [];
+
+static size_t GetFreeMem()
+{
+	// First 4 bytes (gauranteed): amount of free memory.
+	// The rest are optional DPMI fields (-1 means unavailable).
+	uint8_t info[48];
+
+	__asm
+	{
+		lea edi, [info]
+		mov ax, 0500h
+		int 31h
+	}
+
+	const size_t bytesFree = *(reinterpret_cast<size_t *>(info));
+	return bytesFree;
+}
+
+// Keyboard codes.
+#define KEY_ESC        27
+#define KEY_ENTER      13
+#define KEY_SPACE      32
+#define KEY_SCAN_UP    72
+#define KEY_SCAN_DOWN  80
+#define KEY_SCAN_LEFT  75
+#define KEY_SCAN_RIGHT 77
+
+__inline bool IsScanCode(int key)
+{
+	return 0 == key || 224 == key;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+//
+// Video (double-buffered 320x240x8bpp Mode X).
+//
+// - This is a planar mode. 
+// - VRAM is accessed through 4 80*240 planes covering every 1st, 2nd, 3rd and 4th pixel.
+// - Unchained mode grants access to the full 256KB of VRAM, or 4 pages total.
+// 
+// For more information on this use Google or Abrash's black book.
+// 
+// --------------------------------------------------------------------------------------------------------------------
+
+#include "VGA.h" 
+
+#pragma aux SetTextMode = \
+	"mov ah, 0", \
+	"mov al, 3", \
+	"int 10h"    \
+	modify [ax];
+
+#pragma aux SetMCGA = \
+	"mov ah, 0",   \
+	"mov al, 13h", \
+	"int 10h"      \
+	modify [ax];
+
+static void WaitVBL()
+{
+	while (0 != (inp(VGA_STATUS) & 0x08)) {} // Wait for VBLANK end.
+	while (0 == (inp(VGA_STATUS) & 0x08)) {} // Wait for VBLANK begin.
+}
+
+static void SetModeX()
+{
+	SetMCGA();
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+//
+// Audio.
 //
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -89,9 +174,7 @@ static bool Audio_Create()
 	// Present MIDAS configuration screen.
 	if (FALSE == MIDASconfig())
 	{
-		if (0 == MIDASgetLastError())
-			sprintf(s_lastErr, "MIDAS configuration cancelled by user.");
-		else
+		if (0 != MIDASgetLastError())
 			Audio_SetLastError();
 
 		return false;
@@ -121,20 +204,6 @@ static void Audio_Destroy()
 // Main.
 //
 // --------------------------------------------------------------------------------------------------------------------
-
-// Keyboard codes.
-#define KEY_ESC        27
-#define KEY_ENTER      13
-#define KEY_SPACE      32
-#define KEY_SCAN_UP    72
-#define KEY_SCAN_DOWN  80
-#define KEY_SCAN_LEFT  75
-#define KEY_SCAN_RIGHT 77
-
-__inline bool IsScanCode(int key)
-{
-	return 0 == key || 224 == key;
-}
 
 int main(int argC, char **argV)
 {
