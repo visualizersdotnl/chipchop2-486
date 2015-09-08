@@ -4,11 +4,8 @@
 	The MS-DOS 486DX port by Space Operator / Megahawks INC.
 	Original Amiga 500 version by Tim/TBL.
 
-	Oldschool C-style rewrite.
-
-	General notes:
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
-	- Code style is a blend of 1990s and semi-modern: yes classes, no ASSERT.
+	- Code style is a blend of 1990s and semi-modern (yes classes, no ASSERT).
 	- Compiler is babied a little for optimal code generation.
 
 	To do:
@@ -32,7 +29,8 @@
 //
 // 'SetLastError()'
 //
-// If text is set it will be displayed on exit along with return code 1.
+// If text is set on exit, it will be displayed and code 1 returned.
+// This strategy works because practically any error in this disk is fatal.
 //
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -40,7 +38,7 @@ static char s_lastErr[256] = { 0 };
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Misc. low-level stuff.
+// Misc. (low-level) stuff.
 //
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -58,6 +56,13 @@ void _disable();
 
 void _enable();
 #pragma aux _enable = "sti" modify nomemory exact [];
+
+void SetDisplayMode(unsigned mode);
+#pragma aux SetDisplayMode = \
+	"mov ah, 0", \
+	"mov al, 3", \
+	"int 10h"    \
+	parm [eax] modify nomemory exact [eax];
 
 static size_t GetFreeMem()
 {
@@ -99,22 +104,11 @@ __inline bool IsScanCode(int key)
 // - Unchained mode grants access to the full 256KB of VRAM, or 4 pages total.
 // 
 // For more information on this use Google or Abrash's black book.
+// Or this: http://www.osdever.net/FreeVGA/vga/vga.htm
 // 
 // --------------------------------------------------------------------------------------------------------------------
 
 #include "VGA.h" 
-
-#pragma aux SetTextMode = \
-	"mov ah, 0", \
-	"mov al, 3", \
-	"int 10h"    \
-	modify [ax];
-
-#pragma aux SetMCGA = \
-	"mov ah, 0",   \
-	"mov al, 13h", \
-	"int 10h"      \
-	modify [ax];
 
 static void WaitVBL()
 {
@@ -124,7 +118,7 @@ static void WaitVBL()
 
 static void SetModeX()
 {
-	SetMCGA();
+	SetDisplayMode(0x13);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
