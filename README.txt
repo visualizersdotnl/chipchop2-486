@@ -9,13 +9,13 @@ No problem of course if you're using DOSBox or any VM.
 
 DOSBox instructions for Windows:
 - Install 0.74 or later.
-- Modify mount path at bottom of dosbox-0.74.conf
-- Launch with .conf file: DOSBox.exe -conf <path>/dosbox-0.74.conf
+- Modify mount path at bottom of dosbox-0.74-win32.conf
+- Launch with .conf file: DOSBox.exe -conf dosbox-0.74-win32.conf
 
-DOSBox instructions for OSX:
+DOSBox instructions for Linux & OSX:
 - Install 0.74 or later.
-- Modify mount path at bottom of dosbox-0.74-osx.conf
-- Launch with .conf file: open -a DOSBox --args -conf ~/<path>/dosbox-0.74-osx.conf
+- Modify mount path at bottom of dosbox-0.74-linux.conf
+- Launch with .conf file: open -a DOSBox --args -conf dosbox-0.74-linux.conf
 
 ** First time? **
 Head over to /disk/tracks and type 'wmake' then 'build' to build the track archive.

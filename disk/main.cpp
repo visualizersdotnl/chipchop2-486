@@ -5,8 +5,7 @@
 	Original Amiga 500 version by Tim/TBL.
 
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
-	- Code style is a blend of 1990s and semi-modern (yes classes, no ASSERT).
-	- Compiler is babied a little for optimal code generation.
+	- Compiler is old, so I babied it a little to aid code generation.
 
 	To do:
 	- Play *all* tracks flawlessly (including AHX), only then proceed to graphics.
@@ -25,6 +24,8 @@
 #include "minilzo/minilzo.h"
 #include "tracks\tracks.h"
 
+#include "VGA.h"
+
 // --------------------------------------------------------------------------------------------------------------------
 //
 // 'SetLastError()'
@@ -38,7 +39,7 @@ static char s_lastErr[256] = { 0 };
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Misc. (low-level) stuff.
+// Misc. low-level stuff.
 //
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -77,7 +78,7 @@ static size_t GetFreeMem()
 		int 31h
 	}
 
-	const size_t bytesFree = *(reinterpret_cast<size_t *>(info));
+	const size_t bytesFree = *(reinterpret_cast<size_t*>(info));
 	return bytesFree;
 }
 
@@ -97,7 +98,7 @@ __inline bool IsScanCode(int key)
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Video (double-buffered 320x240x8bpp Mode X).
+// Video (320x240 8-bit Mode X).
 //
 // - This is a planar mode. 
 // - VRAM is accessed through 4 80*240 planes covering every 1st, 2nd, 3rd and 4th pixel.
@@ -108,7 +109,17 @@ __inline bool IsScanCode(int key)
 // 
 // --------------------------------------------------------------------------------------------------------------------
 
-#include "VGA.h" 
+// Resolution, sizes.
+#define kResX   320
+#define kResY   240
+#define kPlaneX (kResX/4)
+#define kPlaneY kResY
+#define kPlane  (kPlaneX*kPlaneY)
+#define kPage   kPlane
+
+uint8_t* const g_pVRAM = (uint8_t *) 0xa0000;
+uint8_t* g_pBack;
+const uint8_t* g_pFront;
 
 static void WaitVBL()
 {
@@ -116,9 +127,18 @@ static void WaitVBL()
 	while (0 == (inp(VGA_STATUS) & 0x08)) {} // Wait for VBLANK begin.
 }
 
+// inline void SetFront
+
 static void SetModeX()
 {
+	// We'll be modifying good old chunky 320x200.
 	SetDisplayMode(0x13);
+
+	// ...
+	outp(SEQ_INDEX, SEQ_MEMORY_MODE);
+	outp(SEQ_DATA, 0x06);
+
+	// 
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -128,25 +148,21 @@ static void SetModeX()
 // --------------------------------------------------------------------------------------------------------------------
 
 static BOOL s_midasStarted = FALSE;
-static MIDASmodule s_modules[kNumTracks] = { NULL }; // FIXME: tracks will become modules & streams (AHX).
+static MIDASmodule s_modules[kNumTracks] = { NULL }
 
-// Set this to a path or anything to supply context to SetLastMIDASError().
-static char s_midasErrorContext[256] = { 0 };
-
-// Used by other functions to set meaningful MIDAS error message.
 static void Audio_SetLastError()
 {
 	const int errNo = MIDASgetLastError();
 	if (0 != errNo)
 	{
-		sprintf(s_lastErr, "MIDAS error (%s): %s", s_midasErrorContext, MIDASgetErrorMessage(errNo));
+		sprintf(s_lastErr, "[MIDAS error] %s", MIDASgetErrorMessage(errNo));
 	}
 }
 
 // Used by Audio_Create().
-static bool Audio_LoadTracks(const char *path)
+static bool Audio_LoadTracks(const char* path)
 {
-	// Initialize MiniLZO (de)compressor.
+	// Initialize (de)compressor.
     if (lzo_init() != LZO_E_OK)
     {
     	sprintf(s_lastErr, "Can't initialize MiniLZO.");

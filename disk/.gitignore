@@ -1,13 +1,8 @@
-
-# Build output.
+# build output
 *.obj
 *.exe
 *.err
 *.map
 
-# Data.
+# data file
 tracks.dat
-
-# Test build.
-test.rar
-test/*

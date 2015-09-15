@@ -1,7 +1,6 @@
-
-# DOSBox captures.
+# DOSBox captures
 capture/*
 
-# Windows shortcuts.
+# Windows shortcuts
 *.lnk
  
