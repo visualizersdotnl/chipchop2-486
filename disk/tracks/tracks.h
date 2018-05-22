@@ -8,29 +8,29 @@
 
 #pragma once
 
-const unsigned kDiskTracks = 21;
+const unsigned kNumDiskTracks = 18; // 21;
 const unsigned kInternalTracks = 2;
-const unsigned kNumTracks = kDiskTracks+kInternalTracks;
+const unsigned kNumTracks = kNumDiskTracks+kInternalTracks;
 
 // 3 strings per track: filename, name & artist(s) (latter two in capitals for the font renderer).
 static const char *s_tracks[kNumTracks*3] =
 {
-	// Disk modules (22).
+	// Disk modules.
 	"FUNNYFRT.MOD", "FUNNY OLD FARTS", "DASCON & TRIACE"
 ,	"RELOAD.MOD", "NEVER MIND", "TRIACE"
-,	"SMOOTH.AHX", "SMOOTH TALKER", "JERRY"
+// ,	"SMOOTH.AHX", "SMOOTH TALKER", "JERRY"
 ,	"RELEG.MOD", "RELEGATION", "DASCON"
 ,	"SSPIRAL.MOD", "SIDEWAY SPIRAL", "TECON"
 ,	"ELVIS.MOD", "MY MUM IS ELVIS", "OPTIC"
 ,	"PANDA.MOD", "PANDA BLUES", "JERRY"
 ,	"LEGENDS.MOD", "LEGENDS NEVER SLEEP", "WOTW"
 ,	"SCREWER.MOD", "SCREWER", "DEETROY"
-,	"DOODLE.AHX", "2K BLUES DOODLE", "TECON"
+//,	"DOODLE.AHX", "2K BLUES DOODLE", "TECON"
 ,	"RANDOM.MOD", "RANDOM PARTS", "ALPHA C"
 ,	"RUINE.MOD", "RUINE", "XYCE"
 ,	"TRAVEL.MOD", "TRAVELLING MINDS", "VEDDER & SLASH"
 ,	"ELIMTRIB.MOD", "ELIMINATOR TRIBUTE", "MOBY"
-,	"GATES.AHX", "GATES", "VIRGILL"
+//,	"GATES.AHX", "GATES", "VIRGILL"
 ,	"DCHIPPER.MOD", "DEAD CHIPPER", "BEX"
 ,	"DUST.MOD", "DUST IN THE WIND", "NET"
 ,	"PHOTO.MOD", "PHOTOGRAPHIC CHIP", "OLLE"
