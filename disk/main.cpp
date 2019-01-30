@@ -5,6 +5,16 @@
 
 	Original Amiga 500 version by Tim/TBL.
 
+	-- NEW NOTES --
+
+	I could try to make this look presentable but there's so much wrong with the approach to most problems
+	that it's probably not worth it.
+
+	Best just keep it as a toy to play around with when you've had a few drinks.
+	For a serious attempt at a music disk on 486 code a new one!
+
+	---------------
+
 	General notes:
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
 	- Code style is a blend of 1990s and semi-modern: yes classes, no ASSERT.
@@ -1705,10 +1715,8 @@ public:
 			
 			MIDAS_ModeX_Flip();
 		}
-		else
-		{
-			MIDAS_ModeX_Cycle();
-		}
+
+		MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -1725,7 +1733,7 @@ private:
 class Credits : public Part
 {
 public:
-	Credits() : Part() {}
+	Credits() : Part(), m_credC2P(320, 32) {}
 	~Credits() {}
 
 private:
@@ -1733,11 +1741,21 @@ private:
 	{
 		GFX::crd_logo.SetPalette(iFade);
 		GFX::crd_font.SetPalette(iFade);
+//		GFX::mnu_font.SetPalette(iFade);
 	}
 
 public:
 	/* virtual */ void Prepare() 
 	{
+		m_credC2P.Clear(kBorder);
+		{
+			uint8_t *pChunky = m_credC2P.GetChunky();
+			unsigned int lineOffs;
+			const char *action = "PRESS ANY KEY";
+			lineOffs  = 0;
+			lineOffs += (320-GFX::crd_font.GetLineWidth(action))>>1;
+			GFX::crd_font.DrawLineX(pChunky+lineOffs, action);
+		}
 	}
 
 	/* virtual */ bool FadeIn(float time)
@@ -1746,13 +1764,10 @@ public:
 
 		SetPalettes(iFade);
 
-		GFX::crd_logo.DrawX(g_pWrite, 0);
+		VGA_ModeX_Clear();
 
-		// Clear bottom half (for now).
-		VGA_ModeX_SetPlanes(0x0f);
-		uint32_t *pDest = reinterpret_cast<uint32_t *>(g_pWrite + 80*136);
-		for (int iClear = 0; iClear < (80*(240-136))/4; ++iClear)
-			*pDest++ = kBorder;
+		GFX::crd_logo.DrawX(g_pWrite, 40);
+		m_credC2P.BlitToVRAMX(g_pWrite, 200);
 
 		MIDAS_ModeX_Flip();
 
@@ -1781,6 +1796,7 @@ public:
 	}
 
 private:
+	C2P m_credC2P;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1792,7 +1808,7 @@ private:
 class Menu : public Part
 {
 public:
-	Menu() : Part(), m_menuC2P(320, 98) {}
+	Menu() : Part(), m_menuC2P(320, 96) {}
 	~Menu() {}
 
 private:
@@ -1805,7 +1821,7 @@ private:
 	}
 
 	// Draw entire information block.
-	void DrawInfo()
+	void DrawInfo(unsigned iFade, unsigned iAnimL, unsigned iAnimR)
 	{
 		// Get artist & name.
 		const size_t iList = m_iTrackSel*3;
@@ -1813,35 +1829,44 @@ private:
 		const char *modArtist = s_tracks[iList+1];
 		const char *modName = s_tracks[iList+2];
 
+		// Fade arrows
+//		GFX::mnu_arr.SetPalette(iFade);
+
 		m_menuC2P.Clear(kBorder);
 		{
 			uint8_t *pChunky = m_menuC2P.GetChunky();
 
 			unsigned int lineOffs;
 
-			const char *action = (m_iTrackPlaying == m_iTrackSel) ? "CURRENTLY PLAYING:" : "SELECT:";
-			lineOffs  = 320*((44-9)/2);
+			const char *action = (m_iTrackPlaying == m_iTrackSel) ? "NOW PLAYING" : "SELECT TRACK";
+			lineOffs  = 320 * ((44-9)/2 + 4);
 			lineOffs += (320-GFX::mnu_font.GetLineWidth(action))>>1;
 			GFX::mnu_font.DrawLineX(pChunky+lineOffs, action);
 
-			lineOffs  = 320*44;
+			lineOffs  = 320 * ((44-9)/2 - 8);
+			{
+				// L
+				const unsigned arrowOffs = 32 + iAnimL>>2;
+//				GFX::mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
+			}
+			{
+				// R
+				const unsigned arrowOffs = 32 + iAnimR>>2;
+//				GFX::mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
+			}
+
+			lineOffs  = 320 * (44+16);
 			lineOffs += (320-GFX::mnu_font.GetLineWidth(modArtist))>>1;
 			GFX::mnu_font.DrawLineX(pChunky+lineOffs, modArtist);
 
-			lineOffs  = 320*(44+9+9);
+			lineOffs  = 320 * (44+32);
 			lineOffs += (320-GFX::mnu_font.GetLineWidth(modName))>>1;
 			GFX::mnu_font.DrawLineX(pChunky+lineOffs, modName);
-
-			lineOffs  = 320*44;
-			lineOffs += 4;
-			GFX::mnu_arr.DrawLineX(pChunky+lineOffs, " "); // L
-			lineOffs += 320-16 - 4*2;
-			GFX::mnu_arr.DrawLineX(pChunky+lineOffs, "!"); // R
 		}
 		m_menuC2P.BlitToVRAMX(g_pWrite, 128);
 	}
 
-	void Draw()
+	void Draw(unsigned iFade, unsigned iAnimL, unsigned iAnimR)
 	{
 		// Draw logo.
 		if (0 != m_iLogo)
@@ -1856,11 +1881,11 @@ private:
 			*pDest++ = kBorder;
 
 		// Draw player bar (C2P).
-		DrawInfo();
+		DrawInfo(iFade, iAnimL, iAnimR);
 
 		// Clear bottom bar (FIXME: scroller).
 		VGA_ModeX_SetPlanes(0x0f);
-		pDest = reinterpret_cast<uint32_t *>(g_pWrite + 80*224);
+		pDest = reinterpret_cast<uint32_t *>(g_pWrite + 80*222);
 		for (int iClear = 0; iClear < (80*16)/4; ++iClear)
 			*pDest++ = kBorder;
 
@@ -1868,7 +1893,8 @@ private:
 	}
 
 public:
-	/* virtual */ void Prepare() 
+	/* virtual */ void Prepare()
+
 	{
 		// First frame: reset state.
 		m_iTrackPlaying = m_iTrackSel = 6;
@@ -1884,13 +1910,16 @@ public:
 		const unsigned int iFade = fto6(time);
 
 		SetPalettes(iFade);
-		Draw();
+		Draw(iFade, 63, 63);
 
 		return time >= 1.f;
 	}
 
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
+		unsigned iFade = 63;
+		unsigned iAnimL = 63, iAnimR = 63;
+
 		if (kInput == m_state)
 		{
 			switch (keyPressed)
@@ -1929,9 +1958,10 @@ public:
 		case kSelectLeft:
 			{
 				const float tDelta = time-m_tTrans;
-				const unsigned int iFade = fto6(tDelta*2.f);
+				iFade = 63;
+				iAnimL = fto6(tDelta*6.f);
 				
-				if (tDelta >= 0.5f)
+				if (tDelta >= 0.25f)
 				{			
 					m_state = kInput;
 				}
@@ -1942,9 +1972,10 @@ public:
 		case kSelectRight:
 			{
 				const float tDelta = time-m_tTrans;
-				const unsigned int iFade = fto6(tDelta*2.f);
+				iFade = 63;
+				iAnimR = fto6(tDelta*6.f);
 
-				if (tDelta >= 0.5f)
+				if (tDelta >= 0.25f)
 				{			
 					m_state = kInput;
 				}
@@ -1955,7 +1986,8 @@ public:
 		case kPlay:
 			{
 				const float tDelta = time-m_tTrans;
-				const unsigned int iFade = fto6(tDelta);
+				iFade = fto6(tDelta*2.f);
+//				iAnimL = iAnimR = iFade;
 
 				// Fade out current track.
 				Audio_SetVolume(63-iFade);
@@ -1964,7 +1996,7 @@ public:
 				GFX::mnu_logo.SetPalette(63-iFade);
 				GFX::mnu_grp.SetPalette(63-iFade);
 
-				if (tDelta >= 1.f)
+				if (tDelta >= 0.5f)
 				{
 					// Start new track.
 					Audio_SelectTrack(m_iTrackSel);
@@ -1983,7 +2015,7 @@ public:
 			break;
 		}
 
-		Draw();
+		Draw(iFade, iAnimL, iAnimR);
 
 		// Exit only by escape, and not during a transition.
 		return KEY_ESC == keyPressed && kInput == m_state;
@@ -2128,7 +2160,7 @@ int main(int argC, char **argV)
 		Part *flow[] =
 		{
 			&accoladeIntro,
-			&credits,
+//			&credits,
 			&menu,
 			&greetings,
 			NULL
