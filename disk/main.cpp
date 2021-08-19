@@ -5,6 +5,10 @@
 
 	Original Amiga 500 version by Tim/TBL.
 
+	-- NEWER NOTES (19/08/2021) --
+
+	I'm going to rush this to the finish line.
+
 	-- NEW NOTES --
 
 	I could try to make this look presentable but there's so much wrong with the approach to most problems
@@ -90,7 +94,7 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-// #define DEVELOPMENT_MODE 
+#define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
@@ -1335,7 +1339,7 @@ class C2P
 public:
 	C2P(unsigned int width, unsigned int height) : 
 	    m_pChunky(new uint8_t[width*height])
-,	    m_xRes4(width>>2), m_yRes(height)
+,	    m_xRes(width), m_xRes4(width>>2), m_yRes(height)
 ,	    m_planeSize((width>>2)*height)
 	{
 //		Clear(kBorder);
@@ -1385,7 +1389,7 @@ public:
 	void BlitToVRAMX(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
-		const size_t topLeft = yOffs*kPlaneW;
+		const size_t topLeft = yOffs*kPlaneW + 40;
 		pVRAM += topLeft;
 
 		// Convert to planar.
@@ -1418,6 +1422,77 @@ public:
 		}
 	}
 
+	// FIXME: UGLY HACK TO DISPLAY SHIT ON THE RIGHT SIDE OF THE SCREEN ONLY
+	void BlitToVRAMX_RIGHT(uint8_t *pVRAM, unsigned int yOffs) const
+	{
+		// Planar offset.
+		const size_t topLeft = yOffs*kPlaneW;
+		pVRAM += topLeft;
+
+		// Convert to planar.
+		const uint32_t *pChunky = reinterpret_cast<uint32_t *>(m_pChunky);
+		uint8_t *pPlanar = pVRAM;
+
+
+		pChunky += m_xRes>>3; // not 8-bit
+		pPlanar += kPlaneW/2;
+
+		for (unsigned int iY = 0; iY < m_yRes; ++iY)
+		{
+			outpb(VP_SEQ_ADDR, VR_SEQ_MAP_MASK);
+
+			for (unsigned int iX4 = 0; iX4 < m_xRes4/2; ++iX4)
+			{
+				uint32_t pixels = *pChunky++;
+
+				outpb(VP_SEQ_DATA, 1<<0);
+				*pPlanar = pixels;
+				pixels >>= 8;
+
+				outpb(VP_SEQ_DATA, 1<<1);
+				*pPlanar = pixels;
+				pixels >>= 8;
+
+				outpb(VP_SEQ_DATA, 1<<2);
+				*pPlanar = pixels;
+				pixels >>= 8;
+
+				outpb(VP_SEQ_DATA, 1<<3);
+				*pPlanar = pixels;
+
+				++pPlanar;
+			}
+
+			pChunky += m_xRes>>3;
+			pPlanar += kPlaneW/2;
+		}
+
+/*
+		unsigned int numPixels4 = m_planeSize;
+		while (numPixels4--)
+		{
+			uint32_t pixels = *pChunky++;
+
+			outpb(VP_SEQ_DATA, 1<<0);
+			*pPlanar = pixels;
+			pixels >>= 8;
+
+			outpb(VP_SEQ_DATA, 1<<1);
+			*pPlanar = pixels;
+			pixels >>= 8;
+
+			outpb(VP_SEQ_DATA, 1<<2);
+			*pPlanar = pixels;
+			pixels >>= 8;
+
+			outpb(VP_SEQ_DATA, 1<<3);
+			*pPlanar = pixels;
+
+			++pPlanar;
+		}
+*/
+	}
+
 	void Clear(unsigned int color)
 	{
 		memset(m_pChunky, color, m_planeSize<<2);
@@ -1429,7 +1504,7 @@ public:
 private:
 	uint8_t *m_pChunky;
 
-	const unsigned int m_xRes4, m_yRes;
+	const unsigned int m_xRes, m_xRes4, m_yRes;
 	const unsigned int m_planeSize;
 };
 
@@ -1721,26 +1796,14 @@ private:
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Credits.
+// Credits (not really).
 //
 // --------------------------------------------------------------------------------------------------------------------
 
 class Credits : public Part
 {
 public:
-	Credits() : Part(), m_credC2P(320, 32) {}
-	~Credits() {}
-
-private:
-	void SetPalettes(unsigned int iFade)
-	{
-		crd_logo.SetPalette(iFade);
-		crd_font.SetPalette(iFade);
-//		mnu_font.SetPalette(iFade);
-	}
-
-public:
-	/* virtual */ void Prepare() 
+	Credits() : Part(), m_credC2P(320, 32) 
 	{
 		m_credC2P.Clear(kBorder);
 		{
@@ -1753,25 +1816,52 @@ public:
 		}
 	}
 
+	~Credits() {}
+
+private:
+	void SetPalettes(unsigned int iFade)
+	{
+		crd_logo.SetPalette(iFade);
+		crd_font.SetPalette(iFade);
+//		mnu_font.SetPalette(iFade);
+	}
+
+	void Draw(float time)
+	{
+		// Yeah yeah, this can be more efficient by not updating the entire screen..
+		VGA_ModeX_Clear();
+
+		crd_logo.DrawX(g_pWrite, 20);
+
+		float whatever = smoothstepf(0.f, 32.f, fmod(time, 1.f));
+		if (whatever >= 16.f) whatever = 16.f - (whatever-16.f);
+
+		const int DYP = -8 + int(whatever);
+		m_credC2P.BlitToVRAMX(g_pWrite, 200+DYP);
+
+		MIDAS_ModeX_Flip();
+	}
+
+public:
+	/* virtual */ void Prepare() 
+	{
+	}
+
 	/* virtual */ bool FadeIn(float time)
 	{
 		const unsigned int iFade = fto6(time);
 
 		SetPalettes(iFade);
 
-		VGA_ModeX_Clear();
+		Draw(time);
 
-		crd_logo.DrawX(g_pWrite, 40);
-		m_credC2P.BlitToVRAMX(g_pWrite, 200);
-
-		MIDAS_ModeX_Flip();
 
 		return time >= 1.f;
 	}
 
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
-		MIDAS_ModeX_Cycle();
+		Draw(time);
 
 		// Skippable by any key.
 		return -1 != keyPressed;
@@ -1801,11 +1891,6 @@ private:
 // --------------------------------------------------------------------------------------------------------------------
 
 #include <math.h>
-
-static __inline float smoothstepf(float t)
-{
-	return t*t * (3.f - 2.f*t);
-}
 
 class Menu : public Part
 {
@@ -1840,13 +1925,30 @@ private:
 
 			unsigned int lineOffs;
 
-			// Ladies and gentlemen: George Mich.. no, animation! Cough..
-			const char *jackson[4] = { "NOW PLAYING", ". NOW PLAYING .", ".. NOW PLAYING ..", ". NOW PLAYING ." };
-			int iJackson = int(fmod((time-m_tMenuAnimOffs), 4.f));
+//			const char *jackson[4] = { "NOW PLAYING", ". NOW PLAYING .", ".. NOW PLAYING ..", ". NOW PLAYING ." };
+//			int iJackson = int(fmod((time-m_tMenuAnimOffs), 4.f));
+//			const char *action = (m_iTrackPlaying == m_iTrackSel) ? jackson[iJackson] : flicker;
 
-			const char *flicker = fmod(time, 0.624f) > 0.314f ? "SELECT TRACK" : "";
+			const char *action = NULL;
+			if (m_iTrackPlaying == m_iTrackSel)
+			{
+				// Ugly.. but it works
+				static char status[256];
+				
+				MIDASplayStatus playStatus;
+				MIDASgetPlayStatus(s_modulePlay, &playStatus);
 
-			const char *action = (m_iTrackPlaying == m_iTrackSel) ? jackson[iJackson] : flicker;
+				// Good enough for now
+				sprintf(status, "PLAYING %02d:%02d:%02d", playStatus.position, playStatus.pattern, playStatus.row);
+
+				action = status;
+			}
+			else
+			{
+				const char *flicker = fmod(time, 0.624f) > 0.214f ? "SELECT TRACK" : ""; // FIXME: constants
+				action = flicker;
+			}
+
 			lineOffs  = 320 * ((44-9)/2 + 4);
 			lineOffs += (320-mnu_font.GetLineWidth(action))>>1;
 			mnu_font.DrawLineX(pChunky+lineOffs, action);
@@ -2075,12 +2177,32 @@ private:
 class Greetings : public Part
 {
 public:
-	Greetings() : Part() {}
+	Greetings() : Part(), m_greetC2P(320, 200) 
+	{
+		// FIXME: later expand to draw entire C2P blocks ready to blit and fade? -> Also move this to constructor!
+		m_greetC2P.Clear(1);
+		{
+			uint8_t *pChunky = m_greetC2P.GetChunky();
+
+			unsigned int lineOffs;
+
+			unsigned int yMul = grt_font.GetHeight() + 2;
+
+			const char *greetings[10] = { "...", "TPB", "TBL", "COCOON", "FAIRLIGHT", "DESIRE", "LINEOUT", "EFC", "SATORI", "..."};
+			for (int iGreet = 0; iGreet < 10; ++iGreet)
+			{
+				lineOffs  = 160 + iGreet*yMul*320;
+				lineOffs += (160-crd_font.GetLineWidth(greetings[iGreet]))>>1;
+				grt_font.DrawLineX(pChunky+lineOffs, greetings[iGreet]);
+			}
+		}
+	}
+
 	~Greetings() {}
 
 	/* virtual */ void Prepare() 
 	{
-		Audio_SelectTrack(0); // TRACK_OUTLINE);
+		Audio_SelectTrack(0); // FIXME: random, or keep playing?
 	}
 
 	/* virtual */ bool FadeIn(float time)
@@ -2088,8 +2210,11 @@ public:
 		const unsigned int iFade = fto6(time);
 
 		grt_girl.SetPalette(iFade);
+		grt_font.SetPalette(iFade);
 
 		grt_girl.DrawX(g_pWrite, 0);
+		m_greetC2P.BlitToVRAMX_RIGHT(g_pWrite, 20);
+
 		MIDAS_ModeX_Flip();
 
 		return time >= 1.f;
@@ -2110,12 +2235,14 @@ public:
 		Audio_SetVolume(iFade);
 
 		grt_girl.SetPalette(iFade);
+		grt_font.SetPalette(iFade);
 		MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
 	}
 
 private:
+	C2P m_greetC2P;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -2171,9 +2298,9 @@ int main(int argC, char **argV)
 		// Flow.
 		Part *flow[] =
 		{
-			&accoladeIntro,
-			&credits,
-			&menu,
+//			&accoladeIntro,
+//			&credits,
+//			&menu,
 			&greetings,
 			NULL
 		};
@@ -2258,7 +2385,7 @@ int main(int argC, char **argV)
 	printf("+-diP----------------------------------aSL-+     \n");
 	printf("\n");
 	printf("Chip Chop #16 by DESiRE.\n");
-	printf("MS-DOS 486-DX port by MEGAHAWKS INC.\n");
+	printf("MS-DOS 486-DX port & extras by MEGAHAWKS INC.\n");
 	printf("\n");
 	printf("Remember kids: DOS does it better, and Accolade lives!\n");
 
