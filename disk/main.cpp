@@ -45,10 +45,10 @@
 
 	- Speed up C2P.
 	  + First steps in C taken, it looks slightly better now.
-	  + Look at Kalms' reply to your Facebook request for good tips.
+	  + Look at Kalms' reply to your Facebook request for good tips (yeah that's long gone now, use your own brain).
 	
-	- Abbreviate track names so they fit within the arrows (look at Tim's version).
 	- AHX replay.
+	- Abbreviate track names so they fit within the arrows (look at Tim's version) -> ?
 	- Some functions have 320 pixels wide constraints (keep most for speed, add non-restricted when needed).
 	- Finish the actual parts (look at Tim's Amiga version for ref.).
 
@@ -90,12 +90,12 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-#define DEVELOPMENT_MODE 
+// #define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
 // - Only works in DEVELOPMENT_MODE.
-// #define DUMP_C_DATA 
+#define DUMP_C_DATA 
 
 // Keyboard codes.
 #define KEY_ESC        27
@@ -261,8 +261,8 @@ static bool WriteFile(const char *path, bool binary, const void *pSrc, size_t nu
 
 __inline const char *StripPath(const char *path)
 {
-	// Assumes we're always stripping 'gfx\' (raw graphics data path, FIXME).
-	return path+4;
+	// Assumes we're always stripping 'graphics\' (raw graphics data path, FIXME).
+	return path+9;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -703,8 +703,8 @@ static bool Audio_Start()
 
 	// Start random Accolade track.
 	int trackIdx = kNumTracks-kInternalTracks; // TRACK_GRAND_PRIX_CIRCUIT;
-	//if (rand()&15 > 7) ++trackIdx;
-	++trackIdx;
+	if (rand()&15 > 7) ++trackIdx;
+//	++trackIdx;
 	s_modulePlay = MIDASplayModule(s_modules[trackIdx], TRUE);
 	if (0 == s_modulePlay)
 	{
@@ -873,13 +873,13 @@ public:
 		char declaration[256];
 		sprintf(declaration, "uint8_t g_bitmap_%s[]", name);
 		Bin2H(header, declaration, pBitmap, bitmapSize);
-		AddRef(declaration);
+//		AddRef(declaration);
 
 		if (NULL != pPalette)
 		{
 			sprintf(declaration, "uint8_t g_palette_%s[]", name);
 			Bin2H(header, declaration, pPalette, palSize);
-			AddRef(declaration);
+//			AddRef(declaration);
 		}
 
 		// Add (global) instance.
@@ -1436,12 +1436,8 @@ private:
 // --------------------------------------------------------------------------------------------------------------------
 //
 // Global graphics (embedded on release).
-// Namespace GFX.
 //
 // --------------------------------------------------------------------------------------------------------------------
-
-namespace GFX
-{
 
 #if defined(DEVELOPMENT_MODE)
 
@@ -1482,11 +1478,10 @@ Font grt_font("graphics\\grt_font", 1090, 16, 16, 24, 32);
 	Generate by defining DUMP_C_DATA & DEVELOPMENT_MODE.
 */
 
+#include "data.cpp"
 #include "data.h"
 
 #endif // defined(DEVELOPMENT_MODE)
-
-} // GFX
 
 // --------------------------------------------------------------------------------------------------------------------
 //
@@ -1604,13 +1599,13 @@ public:
 
 	/* virtual */ bool FadeIn(float time)
 	{		
-		const unsigned int iFade = fto6(time*4.f); 
+		const unsigned int iFade = fto6(time*2.f); 
 
-		GFX::accolade.SetPalette(iFade);
+		accolade.SetPalette(iFade);
 
 		// Plane transition.
 		// Only possibly screws up if we miss 4 frames at one specific time.
-		const uint8_t *pPlanar = GFX::accolade.GetBitmap();
+		const uint8_t *pPlanar = accolade.GetBitmap();
 		const unsigned int iPage = iFade>>4;
 		VGA_ModeX_SetPlane(iPage);
 		uint8_t *pDest = g_pWrite;
@@ -1619,7 +1614,7 @@ public:
 
 		MIDAS_ModeX_Flip();
 
-		return time >= 0.25f;
+		return time >= 0.5f; // 0.25f;
 	}
 
 	/* virtual */ bool Main(float time, int keyPressed)
@@ -1702,12 +1697,12 @@ public:
 	{
 		const unsigned int iFade = fto6(time);
 
-		GFX::accolade.SetPalette(63-iFade);
+		accolade.SetPalette(63-iFade);
 
 		if (iFade < 16)
 		{
 			// Plane transition (first 16 frames).
-			const uint8_t *pPlanar = GFX::accolade.GetBitmap();
+			const uint8_t *pPlanar = accolade.GetBitmap();
 			const unsigned int iPage = iFade>>2;
 			VGA_ModeX_SetPlane(0x3-iPage);
 			uint8_t *pDest = g_pWrite;
@@ -1739,9 +1734,9 @@ public:
 private:
 	void SetPalettes(unsigned int iFade)
 	{
-		GFX::crd_logo.SetPalette(iFade);
-		GFX::crd_font.SetPalette(iFade);
-//		GFX::mnu_font.SetPalette(iFade);
+		crd_logo.SetPalette(iFade);
+		crd_font.SetPalette(iFade);
+//		mnu_font.SetPalette(iFade);
 	}
 
 public:
@@ -1753,8 +1748,8 @@ public:
 			unsigned int lineOffs;
 			const char *action = "PRESS ANY KEY";
 			lineOffs  = 0;
-			lineOffs += (320-GFX::crd_font.GetLineWidth(action))>>1;
-			GFX::crd_font.DrawLineX(pChunky+lineOffs, action);
+			lineOffs += (320-crd_font.GetLineWidth(action))>>1;
+			crd_font.DrawLineX(pChunky+lineOffs, action);
 		}
 	}
 
@@ -1766,7 +1761,7 @@ public:
 
 		VGA_ModeX_Clear();
 
-		GFX::crd_logo.DrawX(g_pWrite, 40);
+		crd_logo.DrawX(g_pWrite, 40);
 		m_credC2P.BlitToVRAMX(g_pWrite, 200);
 
 		MIDAS_ModeX_Flip();
@@ -1805,23 +1800,30 @@ private:
 //
 // --------------------------------------------------------------------------------------------------------------------
 
+#include <math.h>
+
+static __inline float smoothstepf(float t)
+{
+	return t*t * (3.f - 2.f*t);
+}
+
 class Menu : public Part
 {
 public:
-	Menu() : Part(), m_menuC2P(320, 96) {}
+	Menu() : Part(), m_menuC2P(320, 96), m_tMenuAnimOffs(0.f) {}
 	~Menu() {}
 
 private:
 	void SetPalettes(unsigned int iFade)
 	{
-		GFX::mnu_logo.SetPalette(iFade);
-		GFX::mnu_grp.SetPalette(iFade);
-		GFX::mnu_font.SetPalette(iFade);
-		GFX::mnu_arr.SetPalette(iFade);
+		mnu_logo.SetPalette(iFade);
+		mnu_grp.SetPalette(iFade);
+		mnu_font.SetPalette(iFade);
+		mnu_arr.SetPalette(iFade);
 	}
 
 	// Draw entire information block.
-	void DrawInfo(unsigned iFade, unsigned iAnimL, unsigned iAnimR)
+	void DrawInfo(unsigned iFade, unsigned iAnimL, unsigned iAnimR, float time)
 	{
 		// Get artist & name.
 		const size_t iList = m_iTrackSel*3;
@@ -1830,7 +1832,7 @@ private:
 		const char *modName = s_tracks[iList+2];
 
 		// Fade arrows
-//		GFX::mnu_arr.SetPalette(iFade);
+//		mnu_arr.SetPalette(iAnimL);
 
 		m_menuC2P.Clear(kBorder);
 		{
@@ -1838,41 +1840,47 @@ private:
 
 			unsigned int lineOffs;
 
-			const char *action = (m_iTrackPlaying == m_iTrackSel) ? "NOW PLAYING" : "SELECT TRACK";
+			// Ladies and gentlemen: George Mich.. no, animation! Cough..
+			const char *jackson[4] = { "NOW PLAYING", ". NOW PLAYING .", ".. NOW PLAYING ..", ". NOW PLAYING ." };
+			int iJackson = int(fmod((time-m_tMenuAnimOffs), 4.f));
+
+			const char *flicker = fmod(time, 0.624f) > 0.314f ? "SELECT TRACK" : "";
+
+			const char *action = (m_iTrackPlaying == m_iTrackSel) ? jackson[iJackson] : flicker;
 			lineOffs  = 320 * ((44-9)/2 + 4);
-			lineOffs += (320-GFX::mnu_font.GetLineWidth(action))>>1;
-			GFX::mnu_font.DrawLineX(pChunky+lineOffs, action);
+			lineOffs += (320-mnu_font.GetLineWidth(action))>>1;
+			mnu_font.DrawLineX(pChunky+lineOffs, action);
 
 			lineOffs  = 320 * ((44-9)/2 - 8);
 			{
 				// L
 				const unsigned arrowOffs = 32 + iAnimL>>2;
-//				GFX::mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
+//				mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
 			}
 			{
 				// R
 				const unsigned arrowOffs = 32 + iAnimR>>2;
-//				GFX::mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
+//				mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
 			}
 
 			lineOffs  = 320 * (44+16);
-			lineOffs += (320-GFX::mnu_font.GetLineWidth(modArtist))>>1;
-			GFX::mnu_font.DrawLineX(pChunky+lineOffs, modArtist);
+			lineOffs += (320-mnu_font.GetLineWidth(modArtist))>>1;
+			mnu_font.DrawLineX(pChunky+lineOffs, modArtist);
 
 			lineOffs  = 320 * (44+32);
-			lineOffs += (320-GFX::mnu_font.GetLineWidth(modName))>>1;
-			GFX::mnu_font.DrawLineX(pChunky+lineOffs, modName);
+			lineOffs += (320-mnu_font.GetLineWidth(modName))>>1;
+			mnu_font.DrawLineX(pChunky+lineOffs, modName);
 		}
 		m_menuC2P.BlitToVRAMX(g_pWrite, 128);
 	}
 
-	void Draw(unsigned iFade, unsigned iAnimL, unsigned iAnimR)
+	void Draw(unsigned iFade, unsigned iAnimL, unsigned iAnimR, float time)
 	{
 		// Draw logo.
 		if (0 != m_iLogo)
-			GFX::mnu_logo.DrawX(g_pWrite, 0);
+			mnu_logo.DrawX(g_pWrite, 0);
 		else
-			GFX::mnu_grp.DrawX(g_pWrite, 0);
+			mnu_grp.DrawX(g_pWrite, 0);
 
 		// Clear middle bar.
 		VGA_ModeX_SetPlanes(0x0f);
@@ -1881,7 +1889,7 @@ private:
 			*pDest++ = kBorder;
 
 		// Draw player bar (C2P).
-		DrawInfo(iFade, iAnimL, iAnimR);
+		DrawInfo(iFade, iAnimL, iAnimR, time);
 
 		// Clear bottom bar (FIXME: scroller).
 		VGA_ModeX_SetPlanes(0x0f);
@@ -1910,7 +1918,7 @@ public:
 		const unsigned int iFade = fto6(time);
 
 		SetPalettes(iFade);
-		Draw(iFade, 63, 63);
+		Draw(iFade, 63, 63, 0.f);
 
 		return time >= 1.f;
 	}
@@ -1964,6 +1972,7 @@ public:
 				if (tDelta >= 0.25f)
 				{			
 					m_state = kInput;
+					m_tMenuAnimOffs = time;
 				}
 			}
 
@@ -1978,6 +1987,7 @@ public:
 				if (tDelta >= 0.25f)
 				{			
 					m_state = kInput;
+					m_tMenuAnimOffs = time;
 				}
 			}
 
@@ -1993,8 +2003,8 @@ public:
 				Audio_SetVolume(63-iFade);
 
 				// Fade out logo (just both now, FIXME).
-				GFX::mnu_logo.SetPalette(63-iFade);
-				GFX::mnu_grp.SetPalette(63-iFade);
+				mnu_logo.SetPalette(63-iFade);
+				mnu_grp.SetPalette(63-iFade);
 
 				if (tDelta >= 0.5f)
 				{
@@ -2002,8 +2012,8 @@ public:
 					Audio_SelectTrack(m_iTrackSel);
 
 					// Switch logo right back in (just both now, FIXME).
-					GFX::mnu_logo.SetPalette(63);
-					GFX::mnu_grp.SetPalette(63);
+					mnu_logo.SetPalette(63);
+					mnu_grp.SetPalette(63);
 
 					m_iTrackPlaying = m_iTrackSel;
 					m_iLogo ^= 1;
@@ -2015,7 +2025,7 @@ public:
 			break;
 		}
 
-		Draw(iFade, iAnimL, iAnimR);
+		Draw(iFade, iAnimL, iAnimR, time);
 
 		// Exit only by escape, and not during a transition.
 		return KEY_ESC == keyPressed && kInput == m_state;
@@ -2052,6 +2062,8 @@ private:
 	} m_state;
 
 	float m_tTrans;
+
+	float m_tMenuAnimOffs;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -2075,9 +2087,9 @@ public:
 	{
 		const unsigned int iFade = fto6(time);
 
-		GFX::grt_girl.SetPalette(iFade);
+		grt_girl.SetPalette(iFade);
 
-		GFX::grt_girl.DrawX(g_pWrite, 0);
+		grt_girl.DrawX(g_pWrite, 0);
 		MIDAS_ModeX_Flip();
 
 		return time >= 1.f;
@@ -2097,7 +2109,7 @@ public:
 
 		Audio_SetVolume(iFade);
 
-		GFX::grt_girl.SetPalette(iFade);
+		grt_girl.SetPalette(iFade);
 		MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
@@ -2160,7 +2172,7 @@ int main(int argC, char **argV)
 		Part *flow[] =
 		{
 			&accoladeIntro,
-//			&credits,
+			&credits,
 			&menu,
 			&greetings,
 			NULL

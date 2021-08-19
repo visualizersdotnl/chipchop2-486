@@ -4,5 +4,12 @@
 *.err
 *.map
 
-# data file
+# generated data file(s)
 tracks.dat
+data.cpp
+data.h
+graphics/*.h
+
+# test folders
+TEST/*
+ALPHA/*

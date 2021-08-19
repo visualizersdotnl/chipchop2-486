@@ -8,14 +8,14 @@
 
 #pragma once
 
-const unsigned kNumDiskTracks = 18; // 21;
+const unsigned kNumDiskTracks = 28; // 18 (DSR-only); // 21;
 const unsigned kInternalTracks = 2;
 const unsigned kNumTracks = kNumDiskTracks+kInternalTracks;
 
 // 3 strings per track: filename, name & artist(s) (latter two in capitals for the font renderer).
 static const char *s_tracks[kNumTracks*3] =
 {
-	// Disk modules.
+	// Disk modules (DSR).
 	"FUNNYFRT.MOD", "FUNNY OLD FARTS", "DASCON & TRIACE"
 ,	"RELOAD.MOD", "NEVER MIND", "TRIACE"
 // ,	"SMOOTH.AHX", "SMOOTH TALKER", "JERRY"
@@ -38,10 +38,35 @@ static const char *s_tracks[kNumTracks*3] =
 ,	"CHEAVEN.MOD", "CHIP HEAVEN", "DASCON"
 ,	"CCHOP.MOD", "LETS CHIP CHOP", "MYGG"
 
+	// Disk modules (MEGAHAWKS INC.)
+,	"BEACH.MOD", "BEACHPARTY '89", "DR. VECTOR"
+,	"THINGSOK.MOD", "THINGS ARE O.K", "COPYCRAZY"
+,	"MUSCLE.MOD", "MUSCLEMAN", "COPYMAN"
+,	"ROBOTIC.MOD", "ROBOTIC MUSCLE", "DR. VECTOR"
+,	"LAMBYADA.MOD", "LAMBADA ROBAT", "MC COOLBEAT"
+,	"DRGNSF2.MOD", "DRAGON'S FLIGHT", "COPYMAN"
+,	"TGIGOLOS.MOD", "TOP GIGOLOS", "DR. VECTOR"
+,	"DISCO.MOD", "DISCO WITHOUT GIRL", "MC COOLBEAT" // Couldn't fit the original title :)
+,	"HOSTEEL.MOD", "HORSE OF STEEL", "PIZZA"
+,	"WOMEN.MOD", "WOMEN OF MY DREAM", "DR. VECTOR"
+
 	// Internal modules.
 ,	"GPRIX.MOD",   "", "" // Triace's Grand Prix Circuit cover.
 ,	"THEDUEL.MOD", "", "" // Triace's Test Drive 2: The Duel cover.
 };
+
+/*
+	1.beachparty 89 - dr.vector
+	2.things are o.k. - copycrazy
+	3.muscleman - copyman
+	4.robotic muscle - dr.vector
+	5.lambada robat - mc coolbeat
+	6.dragon's flight - copyman
+	7.top gigolos - dr.vector
+	8.on the disco with no girl - mc coolbeat
+	9.horse of steel - pizza
+	10.women of my dream - dr.vector
+*/
 
 /*
 		section data,data
