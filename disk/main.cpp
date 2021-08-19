@@ -10,9 +10,9 @@
 	I'm going to rush this to the finish line, ugly or not.
 	I'll have it tested on a real 486, which I do not have anymore..
 
-	- Fix buffer blit (with true 160 pixels wide source, though, it doesn't really matter)
+	- Fix buffer blit (with true 160 pixels wide source, though, it doesn't really matter), it's in the fact that plane memory is 'banked'
 	- Attempt some lame effect?
-	- ...
+	- HIDE THIS MESS IN A PRIVATE REPOSITORY!
 
 	-- NEW NOTES --
 
@@ -46,11 +46,11 @@
 
 	- Priority:
 	  + Solve the "ensure first two frames are consistent" problem.
-	  + Read up on those latches (Abrash) and check what it can do for me (I have 1-2 full buffers left for off-screen storage).
+	  + Read up on those latches (Abrash) and check what it can do for me (I have 1-2 full buffers left for off-screen storage) -> Not necessary now.
 	  + Fix multiple shades for separate font draws.
-	  + Analyze generated code.
-	  + Fix argument length issue in WMAKE.
-	  + Reduce memory footprint by not keeping the entire track archive in memory on load.
+	  + Analyze generated code -> Maybe, some day.
+	  + Fix argument length issue in WMAKE -> What?
+	  + Reduce memory footprint by not keeping the entire track archive in memory on load -> Doesn't matter, you'll peak there anyway.
 
 	- Speed up C2P.
 	  + First steps in C taken, it looks slightly better now.
@@ -99,12 +99,12 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-// #define DEVELOPMENT_MODE 
+//#define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
 // - Only works in DEVELOPMENT_MODE.
-// #define DUMP_C_DATA 
+#define DUMP_C_DATA 
 
 // Keyboard codes.
 #define KEY_ESC        27
@@ -702,6 +702,9 @@ static bool Audio_Start()
 	delete[] pUnc;
 	delete[] pModArch;
 
+	// Remove temp. file.
+	remove(kModuleTemp);
+
 	// Set timer (tied with VGA) callbacks.
 	if (FALSE == MIDASsetTimerCallbacks(s_midasRefresh, TRUE, &MIDAS_PreVR, NULL, NULL))
 //	if (FALSE == MIDASsetTimerCallbacks(s_midasRefresh, TRUE, &MIDAS_PreVR, &MIDAS_ImmVR, &MIDAS_InVR))
@@ -745,7 +748,7 @@ static void Audio_Release()
 	}
 
 	// Remove temp. file.
-	remove(kModuleTemp);
+//	remove(kModuleTemp);
 
 	if (TRUE == s_midasStarted)
 		MIDASclose();
@@ -1527,7 +1530,8 @@ Image mnu_logo("graphics\\mnu_logo", 320, 122, 16, 0);
 Image mnu_grp("graphics\\mnu_grp", 320, 122, 16, 16);
 
 Font mnu_font("graphics\\mnu_font", 1024, 9, 16, 2, 16+16);
-Font mnu_arr("graphics\\mnu_arr", 32, 32, 16, 7, 16+16+2);
+Font mnu_fnt2("graphics\\mnu_fnt2", 1024, 9, 16, 2, 16+16+2);
+// Font mnu_arr("graphics\\mnu_arr", 32, 32, 16, 7, 16+16+2);
 
 // Greetings part:
 Image grt_girl("graphics\\grt_girl", 320, 240, 32, 0);
@@ -1796,16 +1800,20 @@ public:
 		{
 			uint8_t *pChunky = m_credC2P.GetChunky();
 			unsigned int lineOffs;
-			const char *action = "PRESS ANY KEY";
+			const char *action = "WRECK DAT KEYBOARD";
 			lineOffs  = 0;
 			lineOffs += (320-crd_font.GetLineWidth(action))>>1;
 			crd_font.DrawLineX(pChunky+lineOffs, action);
 		}
+
+		m_bubblegumMul = 1.f;
 	}
 
 	~Credits() {}
 
 private:
+	float m_bubblegumMul;
+
 	void SetPalettes(unsigned int iFade)
 	{
 		crd_logo.SetPalette(iFade);
@@ -1815,16 +1823,15 @@ private:
 
 	void Draw(float time)
 	{
-		// Yeah yeah, this can be more efficient by not updating the entire screen..
-		VGA_ModeX_Clear();
+		VGA_ModeX_Clear(); // You can move this to Prepare() if you decide to just clear a piece of VRAM (where the bouncey thing is)
 
-		crd_logo.DrawX(g_pWrite, 20);
+		crd_logo.DrawX(g_pWrite, 15);
 
-		float whatever = smoothstepf(0.f, 32.f, fmod(time, 1.f));
-		if (whatever >= 16.f) whatever = 16.f - (whatever-16.f);
+		float whatever = smoothstepf(0.f, 30.f, fmod(time*smoothstepf(1.f, 2.f, m_bubblegumMul), 1.f));
+		if (whatever >= 15.f) whatever = 15.f - (whatever-15.f);
 
 		const int DYP = -8 + int(whatever);
-		m_credC2P.BlitToVRAMX(g_pWrite, 200+DYP);
+		m_credC2P.BlitToVRAMX(g_pWrite, 203+DYP);
 
 		MIDAS_ModeX_Flip();
 	}
@@ -1836,19 +1843,21 @@ public:
 
 	/* virtual */ bool FadeIn(float time)
 	{
-		const unsigned int iFade = fto6(time);
+		const unsigned int iFade = fto6(time*2.f);
 
 		SetPalettes(iFade);
 
 		Draw(time);
 
-
-		return time >= 1.f;
+		return time >= 0.5f;
 	}
 
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
 		Draw(time);
+
+		if (m_bubblegumMul < 2.3f)
+			m_bubblegumMul += time*0.11f;
 
 		// Skippable by any key.
 		return -1 != keyPressed;
@@ -1891,11 +1900,12 @@ private:
 		mnu_logo.SetPalette(iFade);
 		mnu_grp.SetPalette(iFade);
 		mnu_font.SetPalette(iFade);
-		mnu_arr.SetPalette(iFade);
+		mnu_fnt2.SetPalette((iFade>50)?50:iFade);
+//		mnu_arr.SetPalette(iFade);
 	}
 
 	// Draw entire information block.
-	void DrawInfo(unsigned iFade, unsigned iAnimL, unsigned iAnimR, float time)
+	void DrawInfo(unsigned iFade, float time)
 	{
 		// Get artist & name.
 		const size_t iList = m_iTrackSel*3;
@@ -1912,10 +1922,6 @@ private:
 
 			unsigned int lineOffs;
 
-//			const char *jackson[4] = { "NOW PLAYING", ". NOW PLAYING .", ".. NOW PLAYING ..", ". NOW PLAYING ." };
-//			int iJackson = int(fmod((time-m_tMenuAnimOffs), 4.f));
-//			const char *action = (m_iTrackPlaying == m_iTrackSel) ? jackson[iJackson] : flicker;
-
 			const char *action = NULL;
 			if (m_iTrackPlaying == m_iTrackSel)
 			{
@@ -1926,7 +1932,7 @@ private:
 				MIDASgetPlayStatus(s_modulePlay, &playStatus);
 
 				// Good enough for now
-				sprintf(status, "PLAYING %02d:%02d:%02d", playStatus.position, playStatus.pattern, playStatus.row);
+				sprintf(status, "#%02d PTN %02d ROW %02d", playStatus.position, playStatus.pattern, playStatus.row);
 
 				action = status;
 			}
@@ -1936,21 +1942,23 @@ private:
 				action = flicker;
 			}
 
-			lineOffs  = 320 * ((44-9)/2 + 4);
+			lineOffs  = 320 * ((44-9)/2 + 8);
 			lineOffs += (320-mnu_font.GetLineWidth(action))>>1;
 			mnu_font.DrawLineX(pChunky+lineOffs, action);
 
+/*
 			lineOffs  = 320 * ((44-9)/2 - 8);
 			{
 				// L
 				const unsigned arrowOffs = 32 + iAnimL>>2;
-//				mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
+				mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
 			}
 			{
 				// R
 				const unsigned arrowOffs = 32 + iAnimR>>2;
-//				mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
+				mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
 			}
+*/
 
 			lineOffs  = 320 * (44+16);
 			lineOffs += (320-mnu_font.GetLineWidth(modArtist))>>1;
@@ -1958,12 +1966,12 @@ private:
 
 			lineOffs  = 320 * (44+32);
 			lineOffs += (320-mnu_font.GetLineWidth(modName))>>1;
-			mnu_font.DrawLineX(pChunky+lineOffs, modName);
+			mnu_fnt2.DrawLineX(pChunky+lineOffs, modName);
 		}
 		m_menuC2P.BlitToVRAMX(g_pWrite, 128);
 	}
 
-	void Draw(unsigned iFade, unsigned iAnimL, unsigned iAnimR, float time)
+	void Draw(unsigned iFade, float time)
 	{
 		// Draw logo.
 		if (0 != m_iLogo)
@@ -1978,7 +1986,7 @@ private:
 			*pDest++ = kBorder;
 
 		// Draw player bar (C2P).
-		DrawInfo(iFade, iAnimL, iAnimR, time);
+		DrawInfo(iFade, time);
 
 		// Clear bottom bar (FIXME: scroller).
 		VGA_ModeX_SetPlanes(0x0f);
@@ -1994,7 +2002,7 @@ public:
 
 	{
 		// First frame: reset state.
-		m_iTrackPlaying = m_iTrackSel = 6;
+		m_iTrackPlaying = m_iTrackSel = kBeachTrack;
 		m_iLogo = 0;
 		m_state = kInput;
 
@@ -2007,7 +2015,7 @@ public:
 		const unsigned int iFade = fto6(time);
 
 		SetPalettes(iFade);
-		Draw(iFade, 63, 63, 0.f);
+		Draw(iFade, 0.f);
 
 		return time >= 1.f;
 	}
@@ -2036,7 +2044,7 @@ public:
 				break;
 
 			case KEY_SPACE:
-//			case KEY_ENTER:
+			case KEY_ENTER: // Begrudingly I also accept this
 				if (m_iTrackSel != m_iTrackPlaying)
 				{
 					m_state = kPlay;
@@ -2055,8 +2063,7 @@ public:
 		case kSelectLeft:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = 63;
-				iAnimL = fto6(tDelta*6.f);
+				iFade = fto6(tDelta*6.f);
 				
 				if (tDelta >= 0.25f)
 				{			
@@ -2070,8 +2077,7 @@ public:
 		case kSelectRight:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = 63;
-				iAnimR = fto6(tDelta*6.f);
+				iFade = fto6(tDelta*6.f);
 
 				if (tDelta >= 0.25f)
 				{			
@@ -2082,11 +2088,11 @@ public:
 
 			break;
 
+		// Fade out all relevant things and switch over to, it's opposite..
 		case kPlay:
 			{
 				const float tDelta = time-m_tTrans;
 				iFade = fto6(tDelta*2.f);
-//				iAnimL = iAnimR = iFade;
 
 				// Fade out current track.
 				Audio_SetVolume(63-iFade);
@@ -2099,22 +2105,42 @@ public:
 				{
 					// Start new track.
 					Audio_SelectTrack(m_iTrackSel);
-
-					// Switch logo right back in (just both now, FIXME).
-					mnu_logo.SetPalette(63);
-					mnu_grp.SetPalette(63);
-
 					m_iTrackPlaying = m_iTrackSel;
+
+					// Swap logo
 					m_iLogo ^= 1;
+
+					// Transition back
+					m_tTrans = time;
+					m_state = kPlay2;
+				}
+			}
+
+			break;
+
+		// Fading in!
+		case kPlay2:
+			{
+				const float tDelta = time-m_tTrans;
+				iFade = fto6(tDelta*2.f);
+
+				// Fade in logo (just both now, FIXME).
+				mnu_logo.SetPalette(iFade);
+				mnu_grp.SetPalette(iFade);
+
+				if (tDelta >= 0.5f)
+				{
 					m_state = kInput;
 				}
 			}
+
+			break;
 
 		default:
 			break;
 		}
 
-		Draw(iFade, iAnimL, iAnimR, time);
+		Draw(iFade, time);
 
 		// Exit only by escape, and not during a transition.
 		return KEY_ESC == keyPressed && kInput == m_state;
@@ -2147,7 +2173,7 @@ private:
 		kInput,
 		kSelectLeft,
 		kSelectRight,
-		kPlay
+		kPlay, kPlay2
 	} m_state;
 
 	float m_tTrans;
@@ -2376,8 +2402,8 @@ int main(int argC, char **argV)
 	printf(" /______|______|______|___|__\\____|_______\     \n");
 	printf("+-diP----------------------------------aSL-+     \n");
 	printf("\n");
-	printf("Chip Chop #16 by DESiRE.\n");
-	printf("MS-DOS 486-DX port & extras by MEGAHAWKS INC.\n");
+	printf("Chip Chop(ped) #16 by DESiRE.\n");
+	printf("MS-DOS 486-DX port & bonus tunes by MEGAHAWKS INC.\n");
 	printf("\n");
 	printf("Remember kids: DOS does it better, and Accolade lives!\n");
 

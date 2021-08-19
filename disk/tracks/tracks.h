@@ -11,6 +11,7 @@
 const unsigned kNumDiskTracks = 28; // 18 (DSR-only); // 21;
 const unsigned kInternalTracks = 2;
 const unsigned kNumTracks = kNumDiskTracks+kInternalTracks;
+const unsigned kBeachTrack = 18; // Fun in the sun!
 
 // 3 strings per track: filename, name & artist(s) (latter two in capitals for the font renderer).
 static const char *s_tracks[kNumTracks*3] =
