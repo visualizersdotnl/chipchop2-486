@@ -99,7 +99,7 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-//#define DEVELOPMENT_MODE 
+// #define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
@@ -1806,13 +1806,11 @@ public:
 			crd_font.DrawLineX(pChunky+lineOffs, action);
 		}
 
-		m_bubblegumMul = 1.f;
 	}
 
 	~Credits() {}
 
 private:
-	float m_bubblegumMul;
 
 	void SetPalettes(unsigned int iFade)
 	{
@@ -1827,11 +1825,11 @@ private:
 
 		crd_logo.DrawX(g_pWrite, 15);
 
-		float whatever = smoothstepf(0.f, 30.f, fmod(time*smoothstepf(1.f, 2.f, m_bubblegumMul), 1.f));
-		if (whatever >= 15.f) whatever = 15.f - (whatever-15.f);
+		float whatever = smoothstepf(0.f, 32.f, fmod(time, 1.f));
+		if (whatever >= 16.f) whatever = 16.f - (whatever-16.f);
 
 		const int DYP = -8 + int(whatever);
-		m_credC2P.BlitToVRAMX(g_pWrite, 203+DYP);
+		m_credC2P.BlitToVRAMX(g_pWrite, 200+DYP);
 
 		MIDAS_ModeX_Flip();
 	}
@@ -1847,7 +1845,7 @@ public:
 
 		SetPalettes(iFade);
 
-		Draw(time);
+		Draw(0.f);
 
 		return time >= 0.5f;
 	}
@@ -1855,9 +1853,6 @@ public:
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
 		Draw(time);
-
-		if (m_bubblegumMul < 2.3f)
-			m_bubblegumMul += time*0.11f;
 
 		// Skippable by any key.
 		return -1 != keyPressed;
@@ -1871,7 +1866,8 @@ public:
 		Audio_SetVolume(iFade);
 
 		SetPalettes(iFade);
-		MIDAS_ModeX_Cycle();
+		Draw(time);
+//		MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -2023,7 +2019,7 @@ public:
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
 		unsigned iFade = 63;
-		unsigned iAnimL = 63, iAnimR = 63;
+//		unsigned iAnimL = 63, iAnimR = 63;
 
 		if (kInput == m_state)
 		{
@@ -2063,9 +2059,9 @@ public:
 		case kSelectLeft:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = fto6(tDelta*6.f);
+				iFade = fto6(tDelta*8.f);
 				
-				if (tDelta >= 0.25f)
+				if (tDelta >= 0.125f)
 				{			
 					m_state = kInput;
 					m_tMenuAnimOffs = time;
@@ -2077,9 +2073,9 @@ public:
 		case kSelectRight:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = fto6(tDelta*6.f);
+				iFade = fto6(tDelta*8.f);
 
-				if (tDelta >= 0.25f)
+				if (tDelta >= 0.125f)
 				{			
 					m_state = kInput;
 					m_tMenuAnimOffs = time;
