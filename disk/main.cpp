@@ -7,7 +7,12 @@
 
 	-- NEWER NOTES (19/08/2021) --
 
-	I'm going to rush this to the finish line.
+	I'm going to rush this to the finish line, ugly or not.
+	I'll have it tested on a real 486, which I do not have anymore..
+
+	- Fix buffer blit (with true 160 pixels wide source, though, it doesn't really matter)
+	- Attempt some lame effect?
+	- ...
 
 	-- NEW NOTES --
 
@@ -94,12 +99,12 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-#define DEVELOPMENT_MODE 
+// #define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
 // - Only works in DEVELOPMENT_MODE.
-#define DUMP_C_DATA 
+// #define DUMP_C_DATA 
 
 // Keyboard codes.
 #define KEY_ESC        27
@@ -705,11 +710,8 @@ static bool Audio_Start()
 		return false;
 	}
 
-	// Start random Accolade track.
-	int trackIdx = kNumTracks-kInternalTracks; // TRACK_GRAND_PRIX_CIRCUIT;
-	if (rand()&15 > 7) ++trackIdx;
-//	++trackIdx;
-	s_modulePlay = MIDASplayModule(s_modules[trackIdx], TRUE);
+	// Start Accolade track (TD2, 19/8/2021).
+	s_modulePlay = MIDASplayModule(s_modules[kNumTracks-1], TRUE);
 	if (0 == s_modulePlay)
 	{
 		SetLastMIDASError();
@@ -1108,6 +1110,17 @@ public:
 		memcpy(pVRAM, pPlane, m_planeSize);
 	}
 
+	void DrawX_SinglePlane(uint8_t *pVRAM, unsigned int yOffs, unsigned int iPlane) const
+	{
+		const size_t planeOffs = yOffs*kPlaneW;
+		pVRAM += planeOffs;
+		
+		const uint8_t *pPlane = m_pImage;
+
+		VGA_ModeX_SetPlane(iPlane);
+		memcpy(pVRAM, pPlane + m_planeSize*iPlane, m_planeSize);		
+	}
+
 	unsigned int GetWidth()     const { return m_xRes;      }
 	unsigned int GetHeight()    const { return m_yRes;      }
 	unsigned int GetNumColors() const { return m_palSize/3; }
@@ -1389,7 +1402,7 @@ public:
 	void BlitToVRAMX(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
-		const size_t topLeft = yOffs*kPlaneW + 40;
+		const size_t topLeft = yOffs*kPlaneW;
 		pVRAM += topLeft;
 
 		// Convert to planar.
@@ -1422,7 +1435,7 @@ public:
 		}
 	}
 
-	// FIXME: UGLY HACK TO DISPLAY SHIT ON THE RIGHT SIDE OF THE SCREEN ONLY
+	// FIXME: just take in a 160-wide buffer instead of 320 OK?
 	void BlitToVRAMX_RIGHT(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
@@ -1432,7 +1445,6 @@ public:
 		// Convert to planar.
 		const uint32_t *pChunky = reinterpret_cast<uint32_t *>(m_pChunky);
 		uint8_t *pPlanar = pVRAM;
-
 
 		pChunky += m_xRes>>3; // not 8-bit
 		pPlanar += kPlaneW/2;
@@ -1466,31 +1478,6 @@ public:
 			pChunky += m_xRes>>3;
 			pPlanar += kPlaneW/2;
 		}
-
-/*
-		unsigned int numPixels4 = m_planeSize;
-		while (numPixels4--)
-		{
-			uint32_t pixels = *pChunky++;
-
-			outpb(VP_SEQ_DATA, 1<<0);
-			*pPlanar = pixels;
-			pixels >>= 8;
-
-			outpb(VP_SEQ_DATA, 1<<1);
-			*pPlanar = pixels;
-			pixels >>= 8;
-
-			outpb(VP_SEQ_DATA, 1<<2);
-			*pPlanar = pixels;
-			pixels >>= 8;
-
-			outpb(VP_SEQ_DATA, 1<<3);
-			*pPlanar = pixels;
-
-			++pPlanar;
-		}
-*/
 	}
 
 	void Clear(unsigned int color)
@@ -1945,7 +1932,7 @@ private:
 			}
 			else
 			{
-				const char *flicker = fmod(time, 0.624f) > 0.214f ? "SELECT TRACK" : ""; // FIXME: constants
+				const char *flicker = fmod(time, 0.624f) > 0.214f ? "HIT SPACE TO PLAY" : ""; // FIXME: constants
 				action = flicker;
 			}
 
@@ -2049,7 +2036,7 @@ public:
 				break;
 
 			case KEY_SPACE:
-			case KEY_ENTER:
+//			case KEY_ENTER:
 				if (m_iTrackSel != m_iTrackPlaying)
 				{
 					m_state = kPlay;
@@ -2188,10 +2175,11 @@ public:
 
 			unsigned int yMul = grt_font.GetHeight() + 2;
 
-			const char *greetings[10] = { "...", "TPB", "TBL", "COCOON", "FAIRLIGHT", "DESIRE", "LINEOUT", "EFC", "SATORI", "..."};
-			for (int iGreet = 0; iGreet < 10; ++iGreet)
+			const char *greetings[11] = { "TPB", "TBL", "COCOON", "FAIRLIGHT", "DESIRE", "LINEOUT", "EFC", "SATORI", "...", " ", "PRESS ESC."};
+			for (int iGreet = 0; iGreet < 11; ++iGreet)
 			{
 				lineOffs  = 160 + iGreet*yMul*320;
+//				lineOffs  = 0 + iGreet*yMul*160;
 				lineOffs += (160-crd_font.GetLineWidth(greetings[iGreet]))>>1;
 				grt_font.DrawLineX(pChunky+lineOffs, greetings[iGreet]);
 			}
@@ -2202,18 +2190,22 @@ public:
 
 	/* virtual */ void Prepare() 
 	{
-		Audio_SelectTrack(0); // FIXME: random, or keep playing?
+		Audio_SelectTrack(kNumTracks-2);
 	}
 
 	/* virtual */ bool FadeIn(float time)
 	{
+//		VGA_ModeX_Clear();
+
 		const unsigned int iFade = fto6(time);
 
 		grt_girl.SetPalette(iFade);
 		grt_font.SetPalette(iFade);
 
 		grt_girl.DrawX(g_pWrite, 0);
-		m_greetC2P.BlitToVRAMX_RIGHT(g_pWrite, 20);
+
+		unsigned int offset = iFade>>2;
+		m_greetC2P.BlitToVRAMX_RIGHT(g_pWrite, offset);
 
 		MIDAS_ModeX_Flip();
 
@@ -2224,8 +2216,8 @@ public:
 	{
 		MIDAS_ModeX_Cycle();
 
-		// Skippable by any key.
-		return -1 != keyPressed;
+		// Exit only by escape
+		return KEY_ESC == keyPressed;
 	}
 
 	/* virtual */ bool FadeOut(float time)
@@ -2298,9 +2290,9 @@ int main(int argC, char **argV)
 		// Flow.
 		Part *flow[] =
 		{
-//			&accoladeIntro,
-//			&credits,
-//			&menu,
+			&accoladeIntro,
+			&credits,
+			&menu,
 			&greetings,
 			NULL
 		};
