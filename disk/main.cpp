@@ -5,17 +5,20 @@
 
 	Original Amiga 500 version by Tim/TBL.
 
-	-- NEWER NOTES (19/08/2021) --
+	---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	I'm going to rush this to the finish line, ugly or not.
+	NEWER NOTES (19/08/2021):
+
+	I'm going to rush this to the finish line, ugly or not... -> Done!
 	I'll have it tested on a real 486, which I do not have anymore..
 
-	- Fix buffer blit (with true 160 pixels wide source, though, it doesn't really matter), it's in the fact that plane memory is 'banked'
-	- Attempt some lame effect?
-	- HIDE THIS MESS IN A PRIVATE REPOSITORY!
-	- Speed up C2P by storing chunky in Y, X and blitting columns instead of rows!
+	- Clean up!
+	- Private repository!
+	- C2P: storing data differently is the entire key to success!
 
-	-- NEW NOTES --
+	---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	NEW NOTES:
 
 	I could try to make this look presentable but there's so much wrong with the approach to most problems
 	that it's probably not worth it.
@@ -23,7 +26,7 @@
 	Best just keep it as a toy to play around with when you've had a few drinks.
 	For a serious attempt at a music disk on 486 code a new one!
 
-	---------------
+	---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	General notes:
 	- This compiles with native OpenWatcom, which I've supplied in the repository.
@@ -52,15 +55,11 @@
 	  + Analyze generated code -> Maybe, some day.
 	  + Fix argument length issue in WMAKE -> What?
 	  + Reduce memory footprint by not keeping the entire track archive in memory on load -> Doesn't matter, you'll peak there anyway.
-
-	- Speed up C2P.
-	  + First steps in C taken, it looks slightly better now.
-	  + Look at Kalms' reply to your Facebook request for good tips (yeah that's long gone now, use your own brain).
+	  + Speed up C2P strategies -> See above.
 	
 	- AHX replay.
 	- Abbreviate track names so they fit within the arrows (look at Tim's version) -> ?
 	- Some functions have 320 pixels wide constraints (keep most for speed, add non-restricted when needed).
-	- Finish the actual parts (look at Tim's Amiga version for ref.).
 
 	Possible optimizations:
 	- Use IDA & DOSBox debugger (under Windows) to analyze.
@@ -100,12 +99,12 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-// #define DEVELOPMENT_MODE 
+#define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
 // - Only works in DEVELOPMENT_MODE.
-#define DUMP_C_DATA 
+// #define DUMP_C_DATA 
 
 // Keyboard codes.
 #define KEY_ESC        27
@@ -1367,8 +1366,9 @@ public:
 		delete[] m_pChunky;
 	}
 
+/*
 	// X-case: assumes source and dest. are 320 pixels wide.
-	// FIXME: optimize.
+	// FIXME: optimize, if used at all
 	void BlitToRAMX(uint8_t *pDest, unsigned int yOffs) const
 	{
 		// Planar offset.
@@ -1400,9 +1400,10 @@ public:
 			++pPlanar;
 		}
 	}
+*/
 
 	// X-case: assumes m_xRes is 320 pixels.
-	// FIXME: optimize (unroll, assembler, columns, not rows!)
+	// FIXME	
 	void BlitToVRAMX(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
@@ -1410,77 +1411,73 @@ public:
 		pVRAM += topLeft;
 
 		// Convert to planar.
-		const uint32_t *pChunky = reinterpret_cast<uint32_t *>(m_pChunky);
+		const uint8_t *pChunky = m_pChunky;
 		uint8_t *pPlanar = pVRAM;
 
+		// We'll be doing this by the column (assuming, dangerously, that this outpb() is far more expensive than accessing small parts of chunky memory by column)
 		outpb(VP_SEQ_ADDR, VR_SEQ_MAP_MASK);
 
-		unsigned int numPixels4 = m_planeSize;
-		while (numPixels4--)
+		for (unsigned int iX = 0; iX < m_xRes; ++iX)
 		{
-			uint32_t pixels = *pChunky++;
+			const unsigned int bit = iX & 3;
+			outpb(VP_SEQ_DATA, 1<<bit);
 
-			outpb(VP_SEQ_DATA, 1<<0);
-			*pPlanar = pixels;
-			pixels >>= 8;
+			const uint8_t *pChunkyCol = pChunky;
+			uint8_t *pPlanarCol = pPlanar;
 
-			outpb(VP_SEQ_DATA, 1<<1);
-			*pPlanar = pixels;
-			pixels >>= 8;
+			for (unsigned int iY = 0; iY < m_yRes; ++iY)
+			{
+				*pPlanarCol = *pChunkyCol;
 
-			outpb(VP_SEQ_DATA, 1<<2);
-			*pPlanar = pixels;
-			pixels >>= 8;
+				pPlanarCol += kPlaneW;
+				pChunkyCol += m_xRes;
+			}
 
-			outpb(VP_SEQ_DATA, 1<<3);
-			*pPlanar = pixels;
+			++pChunky; // Next column
 
-			++pPlanar;
+			if (bit == 0x3) 
+				++pPlanar; // Next colum after we've done each plane
 		}
 	}
 
-	// FIXME: just take in a 160-wide buffer instead of 320 OK?
-	void BlitToVRAMX_RIGHT(uint8_t *pVRAM, unsigned int yOffs) const
+	// X_R-case: assumes m_xRes is 160 pixels.
+	// FIXME
+	void BlitToVRAMX_R(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
 		const size_t topLeft = yOffs*kPlaneW;
 		pVRAM += topLeft;
 
 		// Convert to planar.
-		const uint32_t *pChunky = reinterpret_cast<uint32_t *>(m_pChunky);
+		const uint8_t *pChunky = m_pChunky;
 		uint8_t *pPlanar = pVRAM;
 
-		pChunky += m_xRes>>3; // not 8-bit
-		pPlanar += kPlaneW/2;
-
+		// We'll be doing this by the column (assuming, dangerously, that this outpb() is far more expensive than accessing small parts of chunky memory by column)
 		outpb(VP_SEQ_ADDR, VR_SEQ_MAP_MASK);
 
-		for (unsigned int iY = 0; iY < m_yRes; ++iY)
+		pPlanar += kPlaneW/2;
+		pChunky += m_xRes>>1;
+
+		for (unsigned int iX = 160; iX < m_xRes; ++iX)
 		{
-			for (unsigned int iX4 = 0; iX4 < m_xRes4/2; ++iX4)
+			const unsigned int bit = iX & 3;
+			outpb(VP_SEQ_DATA, 1<<bit);
+
+			const uint8_t *pChunkyCol = pChunky;
+			uint8_t *pPlanarCol = pPlanar;
+
+			for (unsigned int iY = 0; iY < m_yRes; ++iY)
 			{
-				uint32_t pixels = *pChunky++;
+				*pPlanarCol = *pChunkyCol;
 
-				outpb(VP_SEQ_DATA, 1<<0);
-				*pPlanar = pixels;
-				pixels >>= 8;
-
-				outpb(VP_SEQ_DATA, 1<<1);
-				*pPlanar = pixels;
-				pixels >>= 8;
-
-				outpb(VP_SEQ_DATA, 1<<2);
-				*pPlanar = pixels;
-				pixels >>= 8;
-
-				outpb(VP_SEQ_DATA, 1<<3);
-				*pPlanar = pixels;
-
-				++pPlanar;
+				pPlanarCol += kPlaneW;
+				pChunkyCol += m_xRes;
 			}
 
-			pChunky += m_xRes>>3;
-			pPlanar += kPlaneW/2;
+			++pChunky; // Next column
+
+			if (bit == 0x3) 
+				++pPlanar; // Next colum after we've done each plane
 		}
 	}
 
@@ -1883,8 +1880,6 @@ private:
 //
 // --------------------------------------------------------------------------------------------------------------------
 
-#include <math.h>
-
 class Menu : public Part
 {
 public:
@@ -1898,7 +1893,6 @@ private:
 		mnu_grp.SetPalette(iFade);
 		mnu_font.SetPalette(iFade);
 		mnu_fnt2.SetPalette((iFade>50)?50:iFade);
-//		mnu_arr.SetPalette(iFade);
 	}
 
 	// Draw entire information block.
@@ -1909,9 +1903,6 @@ private:
 //		const char *modFilename = s_tracks[iList+0];
 		const char *modArtist = s_tracks[iList+1];
 		const char *modName = s_tracks[iList+2];
-
-		// Fade arrows
-//		mnu_arr.SetPalette(iAnimL);
 
 		m_menuC2P.Clear(kBorder);
 		{
@@ -1942,20 +1933,6 @@ private:
 			lineOffs  = 320 * ((44-9)/2 + 8);
 			lineOffs += (320-mnu_font.GetLineWidth(action))>>1;
 			mnu_font.DrawLineX(pChunky+lineOffs, action);
-
-/*
-			lineOffs  = 320 * ((44-9)/2 - 8);
-			{
-				// L
-				const unsigned arrowOffs = 32 + iAnimL>>2;
-				mnu_arr.DrawLineX(pChunky + (lineOffs+4+arrowOffs/2), " ");
-			}
-			{
-				// R
-				const unsigned arrowOffs = 32 + iAnimR>>2;
-				mnu_arr.DrawLineX(pChunky + (lineOffs+320-16-arrowOffs/2), "!");
-			}
-*/
 
 			lineOffs  = 320 * (44+16);
 			lineOffs += (320-mnu_font.GetLineWidth(modArtist))>>1;
@@ -1996,7 +1973,6 @@ private:
 
 public:
 	/* virtual */ void Prepare()
-
 	{
 		// First frame: reset state.
 		m_iTrackPlaying = m_iTrackSel = kBeachTrack;
@@ -2020,7 +1996,6 @@ public:
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
 		unsigned iFade = 63;
-//		unsigned iAnimL = 63, iAnimR = 63;
 
 		if (kInput == m_state)
 		{
@@ -2115,7 +2090,7 @@ public:
 
 			break;
 
-		// Fading in!
+		// Fading back 
 		case kPlay2:
 			{
 				const float tDelta = time-m_tTrans;
@@ -2158,7 +2133,6 @@ public:
 	}
 
 private:
-	// C2P for text, arrows et cetera.
 	C2P m_menuC2P;
 
 	unsigned int m_iTrackPlaying;
@@ -2174,7 +2148,6 @@ private:
 	} m_state;
 
 	float m_tTrans;
-
 	float m_tMenuAnimOffs;
 };
 
@@ -2187,7 +2160,7 @@ private:
 class Greetings : public Part
 {
 public:
-	Greetings() : Part(), m_greetC2P(320, 200) 
+	Greetings() : Part(), m_greetC2P(320, 200)
 	{
 		// FIXME: later expand to draw entire C2P blocks ready to blit and fade? -> Also move this to constructor!
 		m_greetC2P.Clear(1);
@@ -2196,13 +2169,12 @@ public:
 
 			unsigned int lineOffs;
 
-			unsigned int yMul = grt_font.GetHeight() + 2;
+			const unsigned int yMul = grt_font.GetHeight() + 2;
 
 			const char *greetings[11] = { "TPB", "TBL", "COCOON", "FAIRLIGHT", "DESIRE", "LINEOUT", "EFC", "SATORI", "...", " ", "PRESS ESC."};
 			for (int iGreet = 0; iGreet < 11; ++iGreet)
 			{
 				lineOffs  = 160 + iGreet*yMul*320;
-//				lineOffs  = 0 + iGreet*yMul*160;
 				lineOffs += (160-crd_font.GetLineWidth(greetings[iGreet]))>>1;
 				grt_font.DrawLineX(pChunky+lineOffs, greetings[iGreet]);
 			}
@@ -2228,7 +2200,7 @@ public:
 		grt_girl.DrawX(g_pWrite, 0);
 
 		unsigned int offset = iFade>>2;
-		m_greetC2P.BlitToVRAMX_RIGHT(g_pWrite, offset);
+		m_greetC2P.BlitToVRAMX_R(g_pWrite, offset);
 
 		MIDAS_ModeX_Flip();
 
@@ -2313,9 +2285,9 @@ int main(int argC, char **argV)
 		// Flow.
 		Part *flow[] =
 		{
-			&accoladeIntro,
+//			&accoladeIntro,
 			&credits,
-			&menu,
+//			&menu,
 			&greetings,
 			NULL
 		};
