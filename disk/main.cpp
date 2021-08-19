@@ -13,6 +13,7 @@
 	- Fix buffer blit (with true 160 pixels wide source, though, it doesn't really matter), it's in the fact that plane memory is 'banked'
 	- Attempt some lame effect?
 	- HIDE THIS MESS IN A PRIVATE REPOSITORY!
+	- Speed up C2P by storing chunky in Y, X and blitting columns instead of rows!
 
 	-- NEW NOTES --
 
@@ -1401,7 +1402,7 @@ public:
 	}
 
 	// X-case: assumes m_xRes is 320 pixels.
-	// FIXME: optimize (unroll, assembler, Kalms).
+	// FIXME: optimize (unroll, assembler, columns, not rows!)
 	void BlitToVRAMX(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
@@ -1452,10 +1453,10 @@ public:
 		pChunky += m_xRes>>3; // not 8-bit
 		pPlanar += kPlaneW/2;
 
+		outpb(VP_SEQ_ADDR, VR_SEQ_MAP_MASK);
+
 		for (unsigned int iY = 0; iY < m_yRes; ++iY)
 		{
-			outpb(VP_SEQ_ADDR, VR_SEQ_MAP_MASK);
-
 			for (unsigned int iX4 = 0; iX4 < m_xRes4/2; ++iX4)
 			{
 				uint32_t pixels = *pChunky++;
@@ -1776,8 +1777,8 @@ public:
 			
 			MIDAS_ModeX_Flip();
 		}
-
-		MIDAS_ModeX_Cycle();
+		else
+			MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
 	}
