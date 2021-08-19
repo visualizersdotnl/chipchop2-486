@@ -1,4 +1,6 @@
 
+** OUTDATED, PLEASE UPDATE **
+
 PC MS-DOS (486DX2-66) port of Chip Chop #16 by Desire (Amiga music disk).
 All tools & libraries included!
 
