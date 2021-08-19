@@ -99,7 +99,7 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-#define DEVELOPMENT_MODE 
+// #define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
@@ -1440,8 +1440,8 @@ public:
 		}
 	}
 
-	// X_R-case: assumes m_xRes is 160 pixels.
-	// FIXME
+	// X_R-case: renders last 160 on right side.
+	// FIXME: use 160 pixel wide buffer
 	void BlitToVRAMX_R(uint8_t *pVRAM, unsigned int yOffs) const
 	{
 		// Planar offset.
@@ -1814,7 +1814,6 @@ private:
 	{
 		crd_logo.SetPalette(iFade);
 		crd_font.SetPalette(iFade);
-//		mnu_font.SetPalette(iFade);
 	}
 
 	void Draw(float time)
@@ -2285,9 +2284,9 @@ int main(int argC, char **argV)
 		// Flow.
 		Part *flow[] =
 		{
-//			&accoladeIntro,
+			&accoladeIntro,
 			&credits,
-//			&menu,
+			&menu,
 			&greetings,
 			NULL
 		};
