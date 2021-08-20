@@ -1792,7 +1792,7 @@ private:
 class Credits : public Part
 {
 public:
-	Credits() : Part(), m_credC2P(320, 32) 
+	Credits() : Part(), m_credC2P(320, 32)
 	{
 		m_credC2P.Clear(kBorder);
 		{
@@ -1822,11 +1822,11 @@ private:
 
 		crd_logo.DrawX(g_pWrite, 15);
 
-		float whatever = smoothstepf(0.f, 32.f, fmod(time, 1.f));
+		float whatever = smoothstepf(0.f, 32.f, fmod(time*1.6180f, 1.f));
 		if (whatever >= 16.f) whatever = 16.f - (whatever-16.f);
 
 		const int DYP = -8 + int(whatever);
-		m_credC2P.BlitToVRAMX(g_pWrite, 200+DYP);
+		m_credC2P.BlitToVRAMX(g_pWrite, 190+DYP);
 
 		MIDAS_ModeX_Flip();
 	}
@@ -1863,14 +1863,15 @@ public:
 		Audio_SetVolume(iFade);
 
 		SetPalettes(iFade);
-		Draw(time);
-//		MIDAS_ModeX_Cycle();
+		MIDAS_ModeX_Cycle();
 
 		return time >= 1.f;
 	}
 
 private:
 	C2P m_credC2P;
+
+	int m_lastBouncePos;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1882,7 +1883,7 @@ private:
 class Menu : public Part
 {
 public:
-	Menu() : Part(), m_menuC2P(320, 96), m_tMenuAnimOffs(0.f) {}
+	Menu() : Part(), m_menuC2P(320, 96) {}
 	~Menu() {}
 
 private:
@@ -1956,7 +1957,7 @@ private:
 		VGA_ModeX_SetPlanes(0x0f);
 		uint32_t *pDest = reinterpret_cast<uint32_t *>(g_pWrite + 80*122);
 		for (int iClear = 0; iClear < (80*6)/4; ++iClear)
-			*pDest++ = kBorder;
+			*pDest++ = kBorder; // 10*0x01010101;
 
 		// Draw player bar (C2P).
 		DrawInfo(iFade, time);
@@ -1965,7 +1966,7 @@ private:
 		VGA_ModeX_SetPlanes(0x0f);
 		pDest = reinterpret_cast<uint32_t *>(g_pWrite + 80*222);
 		for (int iClear = 0; iClear < (80*16)/4; ++iClear)
-			*pDest++ = kBorder;
+			*pDest++ = kBorder; // 10*0x01010101;
 
 		MIDAS_ModeX_Flip();
 	}
@@ -2018,7 +2019,7 @@ public:
 			case KEY_ENTER: // Begrudingly I also accept this
 				if (m_iTrackSel != m_iTrackPlaying)
 				{
-					m_state = kPlay;
+					m_state = kPrepareToPlay;
 					m_tTrans = time;
 				}
 
@@ -2034,12 +2035,9 @@ public:
 		case kSelectLeft:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = fto6(tDelta*8.f);
-				
 				if (tDelta >= 0.125f)
 				{			
 					m_state = kInput;
-					m_tMenuAnimOffs = time;
 				}
 			}
 
@@ -2048,19 +2046,16 @@ public:
 		case kSelectRight:
 			{
 				const float tDelta = time-m_tTrans;
-				iFade = fto6(tDelta*8.f);
-
 				if (tDelta >= 0.125f)
 				{			
 					m_state = kInput;
-					m_tMenuAnimOffs = time;
 				}
 			}
 
 			break;
 
-		// Fade out all relevant things and switch over to, it's opposite..
-		case kPlay:
+		// Fade out logo & tune, swap logo
+		case kPrepareToPlay:
 			{
 				const float tDelta = time-m_tTrans;
 				iFade = fto6(tDelta*2.f);
@@ -2068,7 +2063,7 @@ public:
 				// Fade out current track.
 				Audio_SetVolume(63-iFade);
 
-				// Fade out logo (just both now, FIXME).
+				// Fade logo (out)
 				mnu_logo.SetPalette(63-iFade);
 				mnu_grp.SetPalette(63-iFade);
 
@@ -2083,19 +2078,19 @@ public:
 
 					// Transition back
 					m_tTrans = time;
-					m_state = kPlay2;
+					m_state = kPlay;
 				}
 			}
 
 			break;
 
-		// Fading back 
-		case kPlay2:
+		// Fade stuff back in
+		case kPlay:
 			{
 				const float tDelta = time-m_tTrans;
 				iFade = fto6(tDelta*2.f);
 
-				// Fade in logo (just both now, FIXME).
+				// Fade logo (in)
 				mnu_logo.SetPalette(iFade);
 				mnu_grp.SetPalette(iFade);
 
@@ -2143,11 +2138,10 @@ private:
 		kInput,
 		kSelectLeft,
 		kSelectRight,
-		kPlay, kPlay2
+		kPrepareToPlay, kPlay
 	} m_state;
 
 	float m_tTrans;
-	float m_tMenuAnimOffs;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
