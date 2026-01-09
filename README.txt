@@ -1,5 +1,9 @@
 
-** OUTDATED, PLEASE UPDATE **
+Plan:
+* Set up with VSCode (see issue list)
+* Maybe another project?
+
+** Partially outdated **
 
 PC MS-DOS (486DX2-66) port of Chip Chop #16 by Desire (Amiga music disk).
 All tools & libraries included!
