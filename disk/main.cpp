@@ -99,7 +99,7 @@
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
-// #define DEVELOPMENT_MODE 
+#define DEVELOPMENT_MODE 
 
 // Def. to dump graphics to embedded data container:
 // - Required to build a version that runs without DEVELOPMENT_MODE.
@@ -1975,7 +1975,7 @@ public:
 	/* virtual */ void Prepare()
 	{
 		// First frame: reset state.
-		m_iTrackPlaying = m_iTrackSel = kBeachTrack;
+		m_iTrackPlaying = m_iTrackSel = 0; // kBeachTrack
 		m_iLogo = 0;
 		m_state = kInput;
 

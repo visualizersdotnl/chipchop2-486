@@ -40,6 +40,14 @@ What would be nice to have:
 
 Head over to /disk/tracks and type 'wmake' then 'build' to build the track archive.
 
+Then open up /main.cpp and scroll down until you hit DEVELOPMENT_MODE, read about it, undef. it if it isn't...
+... and perhaps consider DUMP_C_DATA as well, then thereafter you can run w/o DEVELOPMENT_MODE.
+
+See, the disk itself parses the graphics data, processes it, and spits it out into a source file for easy
+linkage. It is crude and should have been done using a separate build tool, yes, I agree.
+
+Tracks *are* processed and compressed into a nifty little archive like they should.
+
 To build the disk (mdisk.exe), simply type:
 - Release: 'wmake'
 -   Debug: 'wmake debug=1'

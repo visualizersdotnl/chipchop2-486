@@ -3,5 +3,15 @@ capture/*
 
 # Windows shortcuts
 *.lnk
- 
-disk/BETA.zip
+
+# Build products 
+disk/TRACKS/*.EXE
+disk/TRACKS/*.OBJ
+disk/MAIN.OBJ
+disk/DATA.CPP
+disk/DATA.H
+disk/MDISK.EXE
+disk/GRAPHICS/*.H
+disk/TRACKS.DAT
+disk/MINILZO/MINILZO.OBJ
+disk/GRAPHICS/*.H
