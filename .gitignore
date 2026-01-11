@@ -4,14 +4,14 @@ capture/*
 # Windows shortcuts
 *.lnk
 
-# Build products 
-disk/TRACKS/*.EXE
-disk/TRACKS/*.OBJ
+# Build products (MDISK only)
 disk/MAIN.OBJ
 disk/DATA.CPP
 disk/DATA.H
 disk/MDISK.EXE
 disk/GRAPHICS/*.H
 disk/TRACKS.DAT
-disk/MINILZO/MINILZO.OBJ
 disk/GRAPHICS/*.H
+disk/tracks/BUILD.EXE
+disk/tracks/BUILD.OBJ
+disk/minilzo/MINILZO.OBJ
