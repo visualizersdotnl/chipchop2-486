@@ -16,10 +16,10 @@ Plan:
 For now, at least in Linux and OSX alike (workflow should adapt to Windows in a jiffy)
 - Make sure DOSBox installed (0.74 or later)
 - Launch into VSCode or something that can/will do the same for you, if you must
-- Open his folder
+- Open this folder
 - Open a local terminal window, and type 'dosbox --conf dosbox-0.74-linux.conf' to get the DOSBox environment started
 - From there on out you're off to the races: read the outdated manual below
-- Be a hero and implemented replay for those .AHX modules :-) 
+- Be a hero and implement replay for those .AHX modules :-) 
 
 I'm not at all very satisfied with the implementation of this port, but it has some interesting and proven/stable code
 in there that you can build upon.
