@@ -4,27 +4,7 @@
 	The MS-DOS 486 port by Space Operator / Megahawks INC.
 
 	Original Amiga 500 version by Tim/TBL.
-
-	---------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	NEWER NOTES (19/08/2021):
-
-	I'm going to rush this to the finish line, ugly or not... -> Done!
-	I'll have it tested on a real 486, which I do not have anymore..
-
-	- Clean up!
-	- Private repository!
-	- C2P: storing data differently is the entire key to success!
-
-	---------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	NEW NOTES:
-
-	I could try to make this look presentable but there's so much wrong with the approach to most problems
-	that it's probably not worth it.
-
-	Best just keep it as a toy to play around with when you've had a few drinks.
-	For a serious attempt at a music disk on 486 code a new one!
+	Rushed to the finish line 19/08/2021 (tested on actual 486DX2/66).
 
 	---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -46,18 +26,17 @@
 	  + VRAM overdraw or non-sequential writes are avoided like the plague.
 	  + Timing is handled in seconds (floating point) and converted to integers (mostly 0-63, 6-bit precision).
 
-	To-do:
-
-	- Priority:
-	  + Solve the "ensure first two frames are consistent" problem.
-	  + Read up on those latches (Abrash) and check what it can do for me (I have 1-2 full buffers left for off-screen storage) -> Not necessary now.
-	  + Fix multiple shades for separate font draws.
-	  + Analyze generated code -> Maybe, some day.
-	  + Fix argument length issue in WMAKE -> What?
-	  + Reduce memory footprint by not keeping the entire track archive in memory on load -> Doesn't matter, you'll peak there anyway.
-	  + Speed up C2P strategies -> See above.
-	
+	Working on:
 	- AHX replay.
+	- Lift pieces of code out of this massive file.
+
+	To-do:
+	- Optimize some of the rendering; star with either implementing a scroller or a logo zoom (like Tim does), which in turn 
+	  will require more efficient C2P strategies.
+	- Do away with saving uncompressed modules to disk temporarily.
+	- Remove memory load spike on startup.
+	- Optimize ad-hoc C2P.
+	
 	- Abbreviate track names so they fit within the arrows (look at Tim's version) -> ?
 	- Some functions have 320 pixels wide constraints (keep most for speed, add non-restricted when needed).
 
@@ -69,8 +48,7 @@
 	- Use the ASM hammer.
 
 	Bugs and issues:
-	- GUS crashes (in DOSBox at least) still there?
-	- Flicker bug on return to text mode (both in DOSBox OSX and PC): FIX!
+	-  Something about GUS crashes? Try in DOSBox.
 
 	Keep an eye on:
 	- Memory req. and statistics (printed on exit in DEVELOPMENT_MODE).
@@ -96,6 +74,7 @@
 
 // Libs:
 #include "midas/include/midasdll.h"
+#include "midas/src/midas/midasdll.h"
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
@@ -573,6 +552,7 @@ static void SetLastMIDASError()
 
 static MIDASmodule Audio_LoadModule(const char *name)
 {
+	// FIXME: load from memory instead (see if there's a way to do this without rebuilding MIDAS but if you have to just do that)
 	MIDASmodule module = MIDASloadModule(kModuleTemp);
 	if (NULL == module)
 	{
@@ -754,10 +734,17 @@ static void Audio_Release()
 		MIDASclose();
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+//
+// Audio - Module & AHX replay.
+//
+// --------------------------------------------------------------------------------------------------------------------
+
 static void Audio_SetVolume(unsigned int volume)
 {
-	// MIDAS full volume is 64 instead of 63, but I use a 6-bit range for this (FIXME).
-	MIDASsetMusicVolume(s_modulePlay, volume+1);
+	if (NULL != s_modulePlay)
+		// MIDAS full volume is 64 instead of 63, but I use a 6-bit range for this (FIXME).
+		MIDASsetMusicVolume(s_modulePlay, volume+1);
 }
 
 static void Audio_SelectTrack(unsigned int iTrack)
@@ -768,6 +755,74 @@ static void Audio_SelectTrack(unsigned int iTrack)
 	}
 
 	s_modulePlay = MIDASplayModule(s_modules[iTrack], TRUE);
+}
+
+static MIDASstreamHandle s_hAHXStream = NULL;
+
+// FIXME: semi-integrate this into Audio_Stop()
+static bool Audio_AHX_Test()
+{
+	// This should return approx. 60Hz (like our ModeX).
+	// By the (old) text I'm told to do this *before* what follows.
+	s_midasRefresh = MIDASgetDisplayRefreshRate();
+
+	if (FALSE == MIDASinit())
+	{
+		SetLastMIDASError();
+		return false;
+	}
+
+	MIDASopenChannels(1); // Assuming that if used properly MIDAS can share that single channel
+
+	// Set timer (tied with VGA) callbacks.
+	if (FALSE == MIDASsetTimerCallbacks(s_midasRefresh, TRUE, &MIDAS_PreVR, NULL, NULL))
+//	if (FALSE == MIDASsetTimerCallbacks(s_midasRefresh, TRUE, &MIDAS_PreVR, &MIDAS_ImmVR, &MIDAS_InVR))
+	{
+		SetLastMIDASError();
+		return false;
+	}
+
+	// Create stream 
+	const unsigned int sampleRate = 44100; // 44.1KHz (FIXME: AHX player output is likely lower)
+	const unsigned int bufLenMS = 16*4;    // 4*16MS - A full update should be rendered & fed every 4 VBLANKs
+
+	s_hAHXStream = MIDASplayStreamPolling(MIDAS_SAMPLE_16BIT_MONO, sampleRate, bufLenMS);
+	if (NULL == s_hAHXStream)
+	{
+		SetLastMIDASError();
+		return false;
+	}
+
+	// FIXME: do I need this?
+	MIDASstartBackgroundPlay(60);
+
+	return true;
+}
+
+static void Audio_AHX_Stop()
+{
+	// FIXME: do I need this?
+	MIDASstopBackgroundPlay();
+
+	// This needs to be added to Audio_Stop()
+	if (NULL != s_hAHXStream)
+		MIDASstopStream(s_hAHXStream);
+
+	MIDAScloseChannels();
+
+	// FIXME: this is already in Audio_Stop()
+	MIDASremoveTimerCallbacks();
+}
+
+static void Audio_AHX_Update()
+{
+	// Try feeding it garbage from here?
+	static int16_t buffer[256];
+	for (int i = 0; i < 256; ++i)
+		buffer[i] = (int16_t) rand();
+
+	// FIXME: first probe how much bytes it needs if that's possible (check API)
+	MIDASfeedStreamData(s_hAHXStream, (unsigned char*) buffer, 512, false);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -2290,12 +2345,48 @@ int main(int argC, char **argV)
 		// Now let's get started.
 		if (true == Audio_Config())
 		{
-			// Set ModeX, then give it a some time to accomodate the display switch.
+			// Set ModeX, then give it a some time to accomodate the display switch (prevents glitch in DOSBox, looks fine on real hardware).
 			SetVideoModeX();
 
 			for (int iDelay = 0; iDelay < 60; ++iDelay)
 				VGA_WaitForVBLANK();
 
+			// AHX test
+			if (true == Audio_AHX_Test())
+			{
+				// Experience teaches the DPMI statistics may not have been fully updated at this point.
+				freeMemPostLoad = GetFreeMem();
+
+				while (1)
+				{
+					// Check for input.
+					int key = -1;
+					if (kbhit())
+					{
+						key = getch();
+
+						// Get scan code if applicable.
+						if (true == IsScanCode(key))
+						{
+							key = getch();
+						}
+					}
+
+					Audio_AHX_Update();
+					MIDAS_ModeX_Cycle();
+
+					// Wait until frame is processed.
+					unsigned int prevFrame = g_frameCount;
+					while (prevFrame == g_frameCount) {}
+
+					if (-1 != key) 
+						break;
+				}
+			}
+
+			Audio_AHX_Stop();
+
+#if 0
 			// Start music & go!
 			if (true == Audio_Start())
 			{
@@ -2333,7 +2424,9 @@ int main(int argC, char **argV)
 
 			// Stop (any) audio & back to text mode.
 			Audio_Stop();
-			SetVideoMode(0x3); // FIXME: this flickers in DOSBox, check on real hardware.
+#endif
+
+			SetVideoMode(0x3); // FIXME: this flickers in DOSBox; doesn't on real hardware.
 
 #ifdef DEVELOPMENT_MODE
 			// Statistics.

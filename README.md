@@ -1,28 +1,29 @@
 
-
 PC MS-DOS (486DX2-66) port of Chip Chop #16 by Desire (Amiga music disk).
+
+# IMPORTANT: currently working on AHX (Amiga-specific) module replay, so things are "in shambles".
+
 All tools & libraries included!
 
 This project is built in MS-DOS.
 
-Have at least 8MB of RAM at your disposal to build (4MB to run). 
+Have at least 8MB of RAM at your disposal to build (4MB to run, approx.).
 No problem of course if you're using DOSBox or any VM.
 
-Plan:
-- Set up with VSCode (see issue list / WIP)
-- Get a proper debug experience (preferably remote) working
-- Maybe another project?
 
-For now, at least in Linux and OSX alike (workflow should adapt to Windows in a jiffy)
-- Make sure DOSBox installed (0.74 or later)
+For now, at least in Linux and OSX alike:
+- Make sure DOSBox installed (0.74 or later), DOSBox-X if you want the debugger.
+  + Tip for OSX users: 'sudo ln -s /Applications/DOSBox.app/Contents/MacOS/DOSBox(-X) /usr/local/bin/dosbox(-x)'
 - Launch into VSCode or something that can/will do the same for you, if you must
-- Open this folder
-- Open a local terminal window, and type 'dosbox --conf dosbox-0.74-linux.conf' to get the DOSBox environment started
+- Open this folder, then open up a terminal (inside VSCode)
+- Run 'startenv' script
 - From there on out you're off to the races: read the outdated manual below
-- Be a hero and implement replay for those .AHX modules :-) 
 
-I'm not at all very satisfied with the implementation of this port, but it has some interesting and proven/stable code
-in there that you can build upon.
+Shouldn't be much different for Windows though I haven't used that setup for a while so it'll need a little love.
+As a bonus this is also usable on a *real* MS-DOS machine.
+
+I'm not at all very satisfied with the implementation of this port, but it has some interesting and proven/stable code in there.
+I'll toy with it now and then and see where it goes (if it goes anywhere).
 
 There are a few niceties worth noting:
 - I dive into the illustrious ModeX (only to demonstrate that it can be quite cumbersome compared to plain old chunky 320x200 'mode 13').
@@ -31,7 +32,9 @@ There are a few niceties worth noting:
 - Go see what lives in '/bonus' <3
 
 What would be nice to have:
+- Check out possible use of a GDB server in DOSBox (https://github.com/hezi/dosbox-x-gdb)
 - A VESA library (you know, those we all made ourselves and were a major PITA when trying to get that new demoscene release to run).
+  + Plus UniVBE :-)
 - An Ad-Lib (is that the correct marketing-approved spelling?) player of sorts for that glorious PC BBS intro sound.
 - More tools of the 1990s MS-DOS trade that I can't recall right now.
 
@@ -69,8 +72,8 @@ Third party:
 - MiniLZO by Markus Oberhumer
 - MIDAS Digital Audio System by Housemarque Inc.
 
-Tools:
-- OpenWatcom
+Tools courtesy of:
+- Watcom (courtesy of OpenWatcom)
 - Netwide Assembler
 - UPX by Markus Oberhumer
 

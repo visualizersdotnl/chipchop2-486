@@ -15,3 +15,4 @@ disk/GRAPHICS/*.H
 disk/tracks/BUILD.EXE
 disk/tracks/BUILD.OBJ
 disk/minilzo/MINILZO.OBJ
+disk/MAIN.ERR
