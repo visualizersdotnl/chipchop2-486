@@ -4,6 +4,9 @@ capture/*
 # Windows shortcuts
 *.lnk
 
+# OSX
+.DS_Store
+
 # Build products (MDISK only)
 disk/MAIN.OBJ
 disk/DATA.CPP
