@@ -27,8 +27,8 @@
 	  + Timing is handled in seconds (floating point) and converted to integers (mostly 0-63, 6-bit precision).
 
 	Working on:
+	- Split this file the dirty old school way: chop out parts and include them, easy and sufficient
 	- AHX replay.
-	  + Rendering a pure sine to stream works, reliably it seems, however: adapt sample rate to the one MIDAS runs in natively!
 	  + Start porting/fitting C implementation of AHX player (there is one on Github that looks suitable).
 
 	To-do:
@@ -96,7 +96,7 @@
 #define KEY_SCAN_LEFT  75
 #define KEY_SCAN_RIGHT 77
 
-__inline bool IsScanCode(int key)
+__inline static bool IsScanCode(int key)
 {
 	return 0 == key || 224 == key;
 }
@@ -172,25 +172,25 @@ static size_t GetFreeMem()
 //
 // --------------------------------------------------------------------------------------------------------------------
 
-__inline float saturatef(float value)
+__inline static float saturatef(float value)
 {
 	if (value < 0.f) value = 0.f;
 	if (value > 1.f) value = 1.f;
 	return value;
 }
 
-__inline float lerpf(float A, float B, float T)
+__inline static float lerpf(float A, float B, float T)
 {
 	return A*(1.f-T) + B*T;
 }
 
-__inline float smoothstepf(float A, float B, float T)
+__inline static float smoothstepf(float A, float B, float T)
 {
 	const float X = saturatef(T);
 	return lerpf(A, B, X*X*X * (X*(X*6.f - 15.f) + 10.f));
 }
 
-__inline float rampf(float A, float B, float T)
+__inline static float rampf(float A, float B, float T)
 {
 	const float X = T*T;
 	return lerpf(A, B, X);
@@ -198,7 +198,7 @@ __inline float rampf(float A, float B, float T)
 
 // Convert floating point value [0, 1] (clamped) to 6-bit unsigned integer [0, 63].
 // Fits exactly for palette and audio fading.
-__inline unsigned int fto6(float value)
+__inline static unsigned int fto6(float value)
 {
 	value = 63.f*saturatef(value);
 	return (unsigned) value;
@@ -249,7 +249,7 @@ static bool WriteFile(const char *path, bool binary, const void *pSrc, size_t nu
 	return false;
 }
 
-__inline const char *StripPath(const char *path)
+__inline static const char *StripPath(const char *path)
 {
 	// Assumes we're always stripping 'graphics\' (raw graphics data path, FIXME).
 	return path+9;
@@ -291,7 +291,7 @@ __inline const char *StripPath(const char *path)
 
 uint8_t *s_pVRAM = (uint8_t *) 0xa0000;
 
-__inline void VGA_WaitForVBLANK()
+__inline static void VGA_WaitForVBLANK()
 {
 	// First wait for VBLANK to end, ideally this won't take ages.
 	while (0 != (inpb(VP_STATUS_ADDR) & 0x08)) {}
@@ -300,7 +300,7 @@ __inline void VGA_WaitForVBLANK()
 	while (0 == (inpb(VP_STATUS_ADDR) & 0x08)) {}
 }
 
-static void VGA_UploadPalette(const uint8_t *pPalette)
+__inline static void VGA_UploadPalette(const uint8_t *pPalette)
 {
 	__asm
 	{
@@ -321,6 +321,7 @@ static void VGA_UploadPalette(const uint8_t *pPalette)
 // Important:
 // - Each page (or buffer if you will) is 320*240 bytes, *but*, you're writing to 80*240 planes each covering 1 pixel.
 // - Use VGA_ModeX_SetPlanes() or VGA_ModeX_SetPlane() to direct your writes to any combination of the 4 planes.
+// - Flag pallete as dirty (set boolean) when modified in RAM so it will be uploaded.
 // - Handle page-flipping yourself (in this case, implemented in the section below).
 //
 // --------------------------------------------------------------------------------------------------------------------
@@ -332,23 +333,23 @@ static void VGA_UploadPalette(const uint8_t *pPalette)
 #define kPlaneSize (kPlaneW*kResY)
 #define kPageSize kPlaneSize
 
-// VRAM buffer pointers.
+// VRAM buffer pointers (guarded by cycle logic).
 uint8_t *g_pWrite;
 const uint8_t *g_pFront;
 
 // Local palette.
 // Flag as dirty to upload for next frame (only uploads kTotalColors, see above).
-static bool s_paletteDirty;
+volatile static bool s_paletteDirty = false;
 static uint8_t s_palette[768];
 
 // Offset is per 4 pixels to address 256KB (kPageSize).
-__inline void VGA_ModeX_SetWritePage(unsigned int offset)
+__inline static void VGA_ModeX_SetWritePage(unsigned int offset)
 {
 	g_pWrite = s_pVRAM+offset;
 }
 
 // Offset is per 4 pixels to address 256KB (kPageSize).
-__inline void VGA_ModeX_SetFrontPage(unsigned int offset)
+__inline static void VGA_ModeX_SetFrontPage(unsigned int offset)
 {
 	g_pFront = s_pVRAM+offset;
 
@@ -357,20 +358,20 @@ __inline void VGA_ModeX_SetFrontPage(unsigned int offset)
 }
 
 // Set plane write mask (4-bit).
-__inline void VGA_ModeX_SetPlanes(unsigned int mask)
+__inline static void VGA_ModeX_SetPlanes(unsigned int mask)
 {
 	outpw(VP_SEQ_ADDR, mask<<8 | VR_SEQ_MAP_MASK);
 }
 
 // Select a single plane for write.
-__inline void VGA_ModeX_SetPlane(unsigned int iX)
+__inline static void VGA_ModeX_SetPlane(unsigned int iX)
 {
 	iX &= 0x3;
 	VGA_ModeX_SetPlanes(1<<iX);
 }
 
 // Clear current page.
-__inline void VGA_ModeX_Clear(unsigned int color = 0)
+__inline static void VGA_ModeX_Clear(unsigned int color = 0)
 {
 	VGA_ModeX_SetPlanes(0x0f);
 	memset(g_pWrite, color, kPageSize);
@@ -413,8 +414,7 @@ static void SetVideoModeX()
 	outpb(VP_CRTC_DATA, vSyncEnd & 0x7f);
 
 	// Registers to modify for our mode, directly taken from Abrash's setup code.
-	// Want to know exactly what? Check the links I supplied.
-	// I spent more than 5 minutes, then realized it wasn't 1995 anymore.
+	// Please refer to his guide(s) and VGA documentation for specifics.
 	outpw(VP_CRTC_ADDR, 0x0d06); // Vertical total.
 	outpw(VP_CRTC_ADDR, 0x3e07); // Overflow bits (bit 8 of vertical counts).
 	outpw(VP_CRTC_ADDR, 0x4109); // Cell height (double scan).
@@ -447,26 +447,28 @@ static void SetVideoModeX()
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Audio & VGA: MIDAS timer callbacks.
+// Audio & VGA: MIDAS timer callbacks (IRQ).
 //
-// This is a reliable (60Hz) timing mechanism, tied to VGA sync.
+// This is a reliable (60Hz) timing mechanism tied to VGA sync.
 //
-// MIDAS offers 3 callbacks, but I've so far found that just using the first one works best (no artifacts).
-// This would be different if I "locked" all volatile variables in the first call, but this way it's just easier.
+// MIDAS offers 3 callbacks but so far I just have use for one.
 //
-// VGA ModeX functions are used to implement page-flipping and palette update.
-//
-// Timer g_runTime is *always* updated at 60Hz, so use it.
-// Also, be sure to explicitly indicate when a frame (page) is ready to be shown!
+// - Use timer g_runTime (~60Hz regardless of dropped frames) as steady timer.
+// - Use the ModeX_Cycle() or ModeX_Flip() when frame has been palette-adjusted/rendered.
+// - Do not start writing to back buffer (read: render) before ModeX_Wait().
 // 
 // --------------------------------------------------------------------------------------------------------------------
 
 #define kTimeStep (1.f/60.f) // 60Hz.
 
-volatile unsigned int g_frameCount = 0;
-volatile float g_runTime = 0.f;
+volatile unsigned int g_frameCount = 0; // Read only!
+volatile float g_runTime = 0.f; // In seconds
 
-volatile int g_frameIssued = -1;
+#define kFrameBusy  -1
+#define kFrameCycle  0
+#define kFrameReady  1
+
+volatile int g_frameIssued = kFrameBusy;
 
 #ifdef DEVELOPMENT_MODE
 static unsigned int s_totalFramesDropped = 0;
@@ -476,29 +478,32 @@ static void MIDAS_CALL MIDAS_PreVR()
 {	
 	// Make a local copy of volatile, then:
 	const int frameIssuedCopy = g_frameIssued;
-	if (frameIssuedCopy >= 0)
+	if (frameIssuedCopy != kFrameBusy)
 	{
+		VGA_WaitForVBLANK();
+
+		// Unless we want copper bars or other trickery, *now* is the time to change the palette
+		if (true == s_paletteDirty)
 		{
-			// Made it: increase frame counter.
-			const unsigned int frameCount = ++g_frameCount;
+			CLI();
+			VGA_UploadPalette(s_palette);
+			STI();
 
-			if (true == s_paletteDirty)
-			{
-				VGA_UploadPalette(s_palette);
-				s_paletteDirty = false;
-			}
-
-			if (frameIssuedCopy > 0)
-			{
-				// Double buffering.
-				static const uint16_t pages[2] = { 0, kPageSize };
-				const unsigned int iPage = frameCount & 1;
-				VGA_ModeX_SetWritePage(pages[iPage]);
-				VGA_ModeX_SetFrontPage(pages[!iPage]);
-			}
-
-			g_frameIssued = -1;
+			s_paletteDirty = false;
 		}
+
+		if (kFrameReady == frameIssuedCopy)
+		{
+			// Swap buffers.
+			static const uint16_t pages[2] = { 0, kPageSize };
+			const unsigned int iPage = g_frameCount & 1;
+			VGA_ModeX_SetWritePage(pages[iPage]);
+			VGA_ModeX_SetFrontPage(pages[!iPage]);
+		}
+		
+		// Flag ready for next frame.
+		++g_frameCount;
+		g_frameIssued = kFrameBusy;
 	}
 #ifdef DEVELOPMENT_MODE
 	else
@@ -512,14 +517,21 @@ static void MIDAS_CALL MIDAS_PreVR()
 	g_runTime += kTimeStep;
 }
 
+// Unused
 // static void MIDAS_CALL MIDAS_ImmVR() {}
 // static void MIDAS_CALL MIDAS_InVR() {}
 
 // Frame done: do not swap buffer (unchanged) but check for palette update(s).
-__inline void MIDAS_ModeX_Cycle() { g_frameIssued = 0; }
+__inline static void ModeX_Cycle() { g_frameIssued = kFrameCycle; }
 
 // Frame done: swap buffer & check for palette update(s).
-__inline void MIDAS_ModeX_Flip()  { g_frameIssued = 1; }
+__inline static void ModeX_Flip()  { g_frameIssued = kFrameReady; }
+
+// Until available to render.
+__inline static void ModeX_Wait() 
+{
+	while (kFrameBusy != g_frameIssued) {}
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 //
@@ -539,6 +551,9 @@ static MIDASmodule s_modules[kNumTracks] = { NULL };
 // Grabbed after switching to VGA mode.
 // Our ModeX is supposed to be exactly 60Hz but especially in emulators the exact rate deviates.
 static unsigned int s_midasRefresh = -1;
+
+// Internal sample rate.
+static DWORD s_midasSampleRate = DWORD(-1);
 
 // Current module play instance.
 static MIDASmodulePlayHandle s_modulePlay = 0;
@@ -605,6 +620,8 @@ static bool Audio_Start()
 		SetLastMIDASError();
 		return false;
 	}
+
+	s_midasSampleRate = MIDASgetOption(MIDAS_OPTION_MIXRATE);
 
 	// Approx. 70% separated, as recommended by Triace.
 	if (FALSE == MIDASsetOption(MIDAS_OPTION_DEFAULT_STEREO_SEPARATION, 45)) 
@@ -757,14 +774,22 @@ static void Audio_Release()
 
 #define kMIDASModuleChannels 8         // Could be 4 but lets keep some headroom for the occasional .XM
 #define kMIDASBackgroundPollRateHz 100 // Default taken from MIDAS example
-#define kAHXStreamSampleRate 44100     // Stream sample rate for AHX render (16-bit integer)
-#define kAHXStreamBufferSizeMS 500     // Buffer size taken from .WAV MIDAS example (which was not intended for DOS, might have to investigate further)
+#define kAHXBufferLengthMS 500         // Length taken from .WAV MIDAS example (tweak perhaps)
 
 // Taken from 'midasstr.c' (MIDAS source code), this way we don't have to guess
 // s->bufferSamples = ((bufferLength * sampleRate / 1000) + 3) & (~3); 
-#define kAHXStreamBufferSize (((kAHXStreamBufferSizeMS * kAHXStreamSampleRate / 1000) + 3) & (~3))
+
+// #define kAHXStreamBufferSize (((kAHXStreamBufferSizeMS * kAHXStreamSampleRate / 1000) + 3) & (~3))
+
+__inline static unsigned int MIDASstrCalculateBufferSize(unsigned int bufferLength, unsigned int sampleRate)
+{
+	return ((bufferLength * sampleRate / 1000) + 3) & (~3); 
+}
+
 
 static MIDASstreamHandle s_hAHXStream = NULL;
+
+static unsigned int s_AHXBufferSize = -1; // In samples
 static int16_t *s_pStreamBuf = NULL;
 
 static void Audio_SetVolume(unsigned int volume)
@@ -801,6 +826,8 @@ static bool Audio_AHX_Test()
 		return false;
 	}
 
+	s_midasSampleRate = MIDASgetOption(MIDAS_OPTION_MIXRATE);
+
 	MIDASopenChannels(1 + kMIDASModuleChannels); // Assuming that if used properly MIDAS can share that single channel
 
 	// Set timer (tied with VGA) callbacks.
@@ -812,12 +839,14 @@ static bool Audio_AHX_Test()
 	}
 
 	// Create stream
-	s_hAHXStream = MIDASplayStreamPolling(MIDAS_SAMPLE_16BIT_MONO, kAHXStreamSampleRate, kAHXStreamBufferSizeMS);
+	s_hAHXStream = MIDASplayStreamPolling(MIDAS_SAMPLE_16BIT_MONO, s_midasSampleRate, kAHXBufferLengthMS);
 	if (NULL == s_hAHXStream)
 	{
 		SetLastMIDASError();
 		return false;
 	}
+
+	sprintf(s_lastErr, "Midas rate: %u\n", s_midasSampleRate);
 
 	// FIXME
 //	MIDASpauseStream(s_hAHXStream);
@@ -827,7 +856,8 @@ static bool Audio_AHX_Test()
 	MIDASstartBackgroundPlay(kMIDASBackgroundPollRateHz);
 
 	// Allocate internal buffer for AHX render
-	s_pStreamBuf = new int16_t[kAHXStreamBufferSize];
+	s_AHXBufferSize = MIDASstrCalculateBufferSize(kAHXBufferLengthMS, s_midasSampleRate);
+	s_pStreamBuf = new int16_t[s_AHXBufferSize];
 
 	return true;
 }
@@ -856,29 +886,28 @@ __inline static int16_t oscSine(float phase)
 	return int16_t(32767.f*sin(phase*k2PI));
 }
 
-// A4 note pitch
-#define kPitch (440.f/kAHXStreamSampleRate)
-
 static bool Audio_AHX_Update()
 {
 	static float phase = 0.f;
 
+	// Exactly how much samples can MIDAS accept now?
 	const unsigned int samplesInBuf = MIDASgetStreamBytesBuffered(s_hAHXStream) / sizeof(int16_t); // Bytes -> Samples (mono 16-bit)
-	const unsigned int remainder = kAHXStreamBufferSize-samplesInBuf; // In samples
+	const unsigned int remainder = s_AHXBufferSize-samplesInBuf; // In samples
 
-	// Continue where we left off for how many the stream will h ave	
+	// Render them
+	const float pitch = 440.f/s_midasSampleRate; // A4
 	for (int i = 0; i < remainder; ++i) {
 //		s_pStreamBuf[i] = rand() % RAND_MAX;
 
 		s_pStreamBuf[i] = oscSine(phase);
-		phase += kPitch;
+		phase += pitch;
 
 		if (phase > 1.f)
 			phase -= 1.f;
 	}
 
-	const unsigned int fed = MIDASfeedStreamData(s_hAHXStream, (unsigned char*) s_pStreamBuf, remainder * sizeof(int16_t), true);
-//	sprintf(s_lastErr, "AHX: stream samples fed: %u", fed>>1);
+	// Feed
+	/* const unsigned int fed = */ MIDASfeedStreamData(s_hAHXStream, (unsigned char*) s_pStreamBuf, remainder * sizeof(int16_t), true);
 
 	return true;
 }
@@ -1067,7 +1096,7 @@ static int *PAL_CalculateFadeTable(const uint8_t *pSrc, unsigned int palSize, co
 }
 
 // Opacity is a 6-bit value, 63 = 1.
-__inline void PAL_Fade(uint8_t *pDest, const uint8_t *pSrc, const int *pTable, unsigned int palSize, unsigned int opacity)
+__inline static void PAL_Fade(uint8_t *pDest, const uint8_t *pSrc, const int *pTable, unsigned int palSize, unsigned int opacity)
 {
 	while (palSize--)
 	{
@@ -1789,7 +1818,7 @@ public:
 		const size_t imgOffs = iPage*kPlaneSize;
 		memcpy(pDest, pPlanar + imgOffs, kPlaneSize);
 
-		MIDAS_ModeX_Flip();
+		ModeX_Flip();
 
 		return time >= 0.5f; // 0.25f;
 	}
@@ -1864,7 +1893,7 @@ public:
 
 		}
 
-		MIDAS_ModeX_Flip();
+		ModeX_Flip();
 		
 		// Can't skip this one.		
 		return time >= duration;
@@ -1885,10 +1914,10 @@ public:
 			uint8_t *pDest = g_pWrite;
 			memset(pDest, 0, kPlaneW*120);
 			
-			MIDAS_ModeX_Flip();
+			ModeX_Flip();
 		}
 		else
-			MIDAS_ModeX_Cycle();
+			ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -1941,7 +1970,7 @@ private:
 		const int DYP = -8 + int(whatever);
 		m_credC2P.BlitToVRAMX(g_pWrite, 190+DYP);
 
-		MIDAS_ModeX_Flip();
+		ModeX_Flip();
 	}
 
 public:
@@ -1976,7 +2005,7 @@ public:
 		Audio_SetVolume(iFade);
 
 		SetPalettes(iFade);
-		MIDAS_ModeX_Cycle();
+		ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -2081,7 +2110,7 @@ private:
 		for (int iClear = 0; iClear < (80*16)/4; ++iClear)
 			*pDest++ = kBorder; // 10*0x01010101;
 
-		MIDAS_ModeX_Flip();
+		ModeX_Flip();
 	}
 
 public:
@@ -2234,7 +2263,7 @@ public:
 
 		// FIXME: this stops any possible animation.
 		SetPalettes(iFade);
-		MIDAS_ModeX_Cycle();
+		ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -2308,14 +2337,14 @@ public:
 		unsigned int offset = iFade>>2;
 		m_greetC2P.BlitToVRAMX_R(g_pWrite, offset);
 
-		MIDAS_ModeX_Flip();
+		ModeX_Flip();
 
 		return time >= 1.f;
 	}
 
 	/* virtual */ bool Main(float time, int keyPressed)
 	{
-		MIDAS_ModeX_Cycle();
+		ModeX_Cycle();
 
 		// Exit only by escape
 		return KEY_ESC == keyPressed;
@@ -2329,7 +2358,7 @@ public:
 
 		grt_girl.SetPalette(iFade);
 		grt_font.SetPalette(iFade);
-		MIDAS_ModeX_Cycle();
+		ModeX_Cycle();
 
 		return time >= 1.f;
 	}
@@ -2406,7 +2435,7 @@ int main(int argC, char **argV)
 			// Set ModeX, then give it a some time to accomodate the display switch (prevents glitch in DOSBox, looks fine on real hardware).
 			SetVideoModeX();
 
-if !defined(DEVELOPMENT_MODE)
+#if !defined(DEVELOPMENT_MODE)
 			for (int iDelay = 0; iDelay < 60; ++iDelay)
 				VGA_WaitForVBLANK();
 #endif
@@ -2432,17 +2461,16 @@ if !defined(DEVELOPMENT_MODE)
 						}
 					}
 
-					if (false == Audio_AHX_Update())
-						break;
-
-					MIDAS_ModeX_Cycle();
-
-					// Wait until frame is processed.
-					unsigned int prevFrame = g_frameCount;
-					while (prevFrame == g_frameCount) {}
-
 					if (-1 != key) 
 						break;
+					
+					// Render AHX if necessary.
+					if (false == Audio_AHX_Update())
+						break;
+					
+					// Render placeholder
+					ModeX_Wait();
+					ModeX_Cycle();
 				}
 			}
 
@@ -2474,13 +2502,10 @@ if !defined(DEVELOPMENT_MODE)
 						}
 					}
 
-					// Render.
+					// Render frame.
+					ModeX_Wait();
 					if (true == pPart->Render(g_runTime, key))
 						++iPart;
-
-					// Wait until frame is processed.
-					unsigned int prevFrame = g_frameCount;
-					while (prevFrame == g_frameCount) {}
 				}
 			}
 
