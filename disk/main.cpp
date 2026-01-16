@@ -27,9 +27,9 @@
 	  + Timing is handled in seconds (floating point) and converted to integers (mostly 0-63, 6-bit precision).
 
 	Working on:
-	- Split this file the dirty old school way: chop out parts and include them, easy and sufficient
+	- Split this file up so it builds a little faster (or just cross-compile).
 	- AHX replay.
-	  + Start porting/fitting C implementation of AHX player (there is one on Github that looks suitable).
+	  + Start porting/fitting C implementation of AHX player ('ahx2play').
 
 	To-do:
 	- Lift pieces of code out of this massive file.
@@ -76,7 +76,8 @@
 
 // Libs:
 #include "midas/include/midasdll.h"
-#include "midas/src/midas/midasdll.h"
+#include "midas/src/midas/midas.h" // Necessary if you need access to MIDAS' innards
+#include "midas/src/midas/sdevice.h"
 #include "minilzo/minilzo.h"
 
 // Undef. to load from/as release content.
@@ -540,6 +541,9 @@ __inline static void ModeX_Wait()
 // In case you're fighting with MIDAS, here's the source code: 
 // - https://github.com/retrodump/midas-Housemarque-Audio-System
 //
+// Most of the internals can be/are included though, which is necessary if the "DLL"  interface
+// does not suffice (like accessing the sound device).
+//
 // --------------------------------------------------------------------------------------------------------------------
 
 // Track list.
@@ -758,29 +762,27 @@ static void Audio_Release()
 
 // --------------------------------------------------------------------------------------------------------------------
 //
-// Audio - Module & AHX replay.
+// Audio - AHX playground (WIP).
 //
 // --------------------------------------------------------------------------------------------------------------------
 
 /*
 	Modules rely on MIDAS' ready-to-go functionality, for AHX I'' have to bring in the cavalry.
 
-	AHX tales:
-
+	AHX tales (correct me if I'm wrong):
 	- The Paula on a stock 1200 offered a maximum sample rate of ~29KHz.
-	- I'll try to render the modules in high fidelity (44.1KHz) and offer an optional 12dB LPF with a cut freq. around 6KHz
-	  which might just make it sound more authentic.
+	- Player ('ahx2play', straight C) I'll try to use claims to render in high fidelity (44.1Khz), we'll have to see how it
+	  fits and if or if it does not have 8-bit support as well. 
+	- Player does not emulate the filter (LED mode), but that seems unnecessary.
 */
 
-#define kMIDASModuleChannels 8         // Could be 4 but lets keep some headroom for the occasional .XM
+#define kMIDASModuleChannels 0         // FIXME (4-8, should not really matter consideirng MIDAS doesn't mix unused channels)
 #define kMIDASBackgroundPollRateHz 100 // Default taken from MIDAS example
-#define kAHXBufferLengthMS 500         // Length taken from .WAV MIDAS example (tweak perhaps)
+#define kAHXBufferLengthMS 100         // MIDAS example uses 500, but that seems to be a bit much if you ask me
+
 
 // Taken from 'midasstr.c' (MIDAS source code), this way we don't have to guess
 // s->bufferSamples = ((bufferLength * sampleRate / 1000) + 3) & (~3); 
-
-// #define kAHXStreamBufferSize (((kAHXStreamBufferSizeMS * kAHXStreamSampleRate / 1000) + 3) & (~3))
-
 __inline static unsigned int MIDASstrCalculateBufferSize(unsigned int bufferLength, unsigned int sampleRate)
 {
 	return ((bufferLength * sampleRate / 1000) + 3) & (~3); 
@@ -788,7 +790,6 @@ __inline static unsigned int MIDASstrCalculateBufferSize(unsigned int bufferLeng
 
 
 static MIDASstreamHandle s_hAHXStream = NULL;
-
 static unsigned int s_AHXBufferSize = -1; // In samples
 static int16_t *s_pStreamBuf = NULL;
 
@@ -813,8 +814,8 @@ static void Audio_SelectTrack(unsigned int iTrack)
 	s_modulePlay = MIDASplayModule(s_modules[iTrack], TRUE);
 }
 
-// FIXME: semi-integrate this into Audio_Stop()
-static bool Audio_AHX_Test()
+// FIXME: semi-integrate this into Audio_Start()
+static bool Audio_AHX_Start()
 {
 	// This should return approx. 60Hz (like our ModeX).
 	// By the (old) text I'm told to do this *before* what follows.
@@ -828,6 +829,15 @@ static bool Audio_AHX_Test()
 
 	s_midasSampleRate = MIDASgetOption(MIDAS_OPTION_MIXRATE);
 
+	// Grab output mode and test for 16-bit stereo compatibility (FIXME)
+	unsigned mode = 0;
+	midasSD->GetMode(&mode);
+	if (!(mode & sd16bit) || !(mode & sdStereo))
+	{
+		sprintf(s_lastErr, "Please select a 16-bit stereo device (8-bit support imminent).\n");
+		return false;
+	}
+
 	MIDASopenChannels(1 + kMIDASModuleChannels); // Assuming that if used properly MIDAS can share that single channel
 
 	// Set timer (tied with VGA) callbacks.
@@ -839,7 +849,7 @@ static bool Audio_AHX_Test()
 	}
 
 	// Create stream
-	s_hAHXStream = MIDASplayStreamPolling(MIDAS_SAMPLE_16BIT_MONO, s_midasSampleRate, kAHXBufferLengthMS);
+	s_hAHXStream = MIDASplayStreamPolling(MIDAS_SAMPLE_16BIT_STEREO, s_midasSampleRate, kAHXBufferLengthMS);
 	if (NULL == s_hAHXStream)
 	{
 		SetLastMIDASError();
@@ -848,7 +858,7 @@ static bool Audio_AHX_Test()
 
 	sprintf(s_lastErr, "Midas rate: %u\n", s_midasSampleRate);
 
-	// FIXME
+	// FIXME: stream should be paused and resumed A) if necessary and B) if buffer has been spooled up
 //	MIDASpauseStream(s_hAHXStream);
 
 	// MIDAS example code enables this at this exact rate, which I dangerously take it to mean it does well with the internal
@@ -857,7 +867,7 @@ static bool Audio_AHX_Test()
 
 	// Allocate internal buffer for AHX render
 	s_AHXBufferSize = MIDASstrCalculateBufferSize(kAHXBufferLengthMS, s_midasSampleRate);
-	s_pStreamBuf = new int16_t[s_AHXBufferSize];
+	s_pStreamBuf = new int16_t[s_AHXBufferSize * 2];
 
 	return true;
 }
@@ -883,7 +893,8 @@ static void Audio_AHX_Stop()
 #define k2PI (2.f*3.1415926535897932384626433832795f)
 __inline static int16_t oscSine(float phase)
 {
-	return int16_t(32767.f*sin(phase*k2PI));
+	// 16384 is a rather staunch amplitude, I'm guessing the max. I'd want to send to MIDAS
+	return int16_t(16384.f*sin(phase*k2PI));
 }
 
 static bool Audio_AHX_Update()
@@ -891,23 +902,25 @@ static bool Audio_AHX_Update()
 	static float phase = 0.f;
 
 	// Exactly how much samples can MIDAS accept now?
-	const unsigned int samplesInBuf = MIDASgetStreamBytesBuffered(s_hAHXStream) / sizeof(int16_t); // Bytes -> Samples (mono 16-bit)
+	const unsigned int samplesInBuf = MIDASgetStreamBytesBuffered(s_hAHXStream) / (2 * sizeof(int16_t)); // Bytes -> Samples (stereo 16-bit)
 	const unsigned int remainder = s_AHXBufferSize-samplesInBuf; // In samples
 
 	// Render them
 	const float pitch = 440.f/s_midasSampleRate; // A4
-	for (int i = 0; i < remainder; ++i) {
-//		s_pStreamBuf[i] = rand() % RAND_MAX;
+	for (unsigned int i = 0; i < remainder; ++i) {
+		const unsigned int index = i << 1;
+		const int16_t sine = oscSine(phase);
+		s_pStreamBuf[index] = sine;
+		s_pStreamBuf[index + 1] = sine;
 
-		s_pStreamBuf[i] = oscSine(phase);
 		phase += pitch;
 
 		if (phase > 1.f)
 			phase -= 1.f;
 	}
 
-	// Feed
-	/* const unsigned int fed = */ MIDASfeedStreamData(s_hAHXStream, (unsigned char*) s_pStreamBuf, remainder * sizeof(int16_t), true);
+	// Feed (should not block because I *just* informed how many samples I could write, but hey it's MIDAS, who knows, FIXME?)
+	/* const unsigned int fed = */ MIDASfeedStreamData(s_hAHXStream, (unsigned char*) s_pStreamBuf, remainder * sizeof(int16_t) * 2, true);
 
 	return true;
 }
@@ -2441,7 +2454,7 @@ int main(int argC, char **argV)
 #endif
 
 			// AHX test
-			if (true == Audio_AHX_Test())
+			if (true == Audio_AHX_Start())
 			{
 				// Experience teaches the DPMI statistics may not have been fully updated at this point.
 				freeMemPostLoad = GetFreeMem();
