@@ -102,7 +102,7 @@ __inline static bool IsScanCode(int key)
 	return 0 == key || 224 == key;
 }
 
-// Megabytes of RAM used by OS environment, extender, packer (UPX adds approx. 200KB) & executable.
+// Megabytes of RAM used by OS environment, extender, packer (UPX adds approx. 200KB, depending on data size) & executable.
 #define kMegsEnvAndEXE 2
 
 // Megabytes of RAM required total.
@@ -556,7 +556,7 @@ static MIDASmodule s_modules[kNumTracks] = { NULL };
 // Our ModeX is supposed to be exactly 60Hz but especially in emulators the exact rate deviates.
 static unsigned int s_midasRefresh = -1;
 
-// Internal sample rate.
+// MIDAS' sound device sample rate (render likewise).
 static DWORD s_midasSampleRate = DWORD(-1);
 
 // Current module play instance.
@@ -767,17 +767,17 @@ static void Audio_Release()
 // --------------------------------------------------------------------------------------------------------------------
 
 /*
-	Modules rely on MIDAS' ready-to-go functionality, for AHX I'' have to bring in the cavalry.
+	Modules rely on MIDAS' ready-to-go functionality, for AHX I'll have to bring in the cavalry.
 
 	AHX tales (correct me if I'm wrong):
 	- The Paula on a stock 1200 offered a maximum sample rate of ~29KHz.
-	- Player ('ahx2play', straight C) I'll try to use claims to render in high fidelity (44.1Khz), we'll have to see how it
+	- Player ('ahx2play', straight C) I'll try to use claims to render in high fidelity (44.1KHz), we'll have to see how it
 	  fits and if or if it does not have 8-bit support as well. 
 	- Player does not emulate the filter (LED mode), but that seems unnecessary.
 */
 
-#define kMIDASModuleChannels 0         // FIXME (4-8, should not really matter consideirng MIDAS doesn't mix unused channels)
-#define kMIDASBackgroundPollRateHz 100 // Default taken from MIDAS example
+#define kMIDASModuleChannels 0         // FIXME (4-8, should not really matter considering MIDAS doesn't mix unused channels)
+#define kMIDASBackgroundPollRateHz 100 // Default taken from MIDAS example (can be used to calc. minimum feed rate)
 #define kAHXBufferLengthMS 100         // MIDAS example uses 500, but that seems to be a bit much if you ask me
 
 
@@ -792,6 +792,7 @@ __inline static unsigned int MIDASstrCalculateBufferSize(unsigned int bufferLeng
 static MIDASstreamHandle s_hAHXStream = NULL;
 static unsigned int s_AHXBufferSize = -1; // In samples
 static int16_t *s_pStreamBuf = NULL;
+
 
 static void Audio_SetVolume(unsigned int volume)
 {
@@ -861,8 +862,6 @@ static bool Audio_AHX_Start()
 	// FIXME: stream should be paused and resumed A) if necessary and B) if buffer has been spooled up
 //	MIDASpauseStream(s_hAHXStream);
 
-	// MIDAS example code enables this at this exact rate, which I dangerously take it to mean it does well with the internal
-	// buffers allocated for the DOS implementation, also this way it's easy to calculate how much should be rendered each frame not to underrun
 	MIDASstartBackgroundPlay(kMIDASBackgroundPollRateHz);
 
 	// Allocate internal buffer for AHX render
@@ -874,16 +873,12 @@ static bool Audio_AHX_Start()
 
 static void Audio_AHX_Stop()
 {
-	// FIXME: do I need this?
-	MIDASstopBackgroundPlay();
-
 	// This needs to be added to Audio_Stop()
 	if (NULL != s_hAHXStream)
 		MIDASstopStream(s_hAHXStream);
 
+	MIDASstopBackgroundPlay();
 	MIDAScloseChannels();
-
-	// FIXME: this is already in Audio_Stop()
 	MIDASremoveTimerCallbacks();
 
 	delete[] s_pStreamBuf;
